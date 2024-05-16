@@ -15,6 +15,7 @@ from tools.model_tools import match_infer, pegasus_single_infer
 import numpy as np
 from paddlenlp.data import Pad, Tuple
 from functools import partial
+import tabulate
 
 
 # 返回新闻 list
@@ -22,7 +23,7 @@ def tianxing_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     tx_data = tx_search(keyword_list)
-    if tx_data['code'] != 200:
+    if tx_data["code"] != 200:
         return []
     tx_data = tx_data["result"]["newslist"]
     if len(tx_data) > news_limit_num:
@@ -36,7 +37,7 @@ def google_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
     keyword_str = " ".join(keyword_list)
     google_data = google_search(keyword_str)
     for data in google_data:
-        data["url"] = data["formattedUrl"]
+        data["url"] = data["link"]
     if len(google_data) > news_limit_num:
         google_data = google_data[:news_limit_num]
     return get_news_list(google_data)
@@ -65,6 +66,7 @@ def pegasus_group_infer(summary_model, summary_tokenizer, sent, news_list):
 
 
 def check_match(match_model, sent, news_list):
+    inv_label_map = {0: "谣言", 1: "非谣言"}
     match_tokenizer = paddlenlp.transformers.ErnieGramTokenizer.from_pretrained(
         "ernie-gram-zh"
     )
@@ -97,10 +99,12 @@ def check_match(match_model, sent, news_list):
     y_probs = match_infer(match_model, predict_data_loader)
     y_preds = np.argmax(y_probs, axis=1)
     test_ds = MapDataset(data_source)
+    result_list = []
     for idx, y_pred in enumerate(y_preds):
         text_pair = test_ds[idx]
-        text_pair["label"] = y_pred
-        print(text_pair)
+        text_pair["label"] = inv_label_map[y_pred]
+        result_list.append(text_pair)
+    print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
 
 
 def check_entailment(entailment_model, sent, news_list):
@@ -110,17 +114,20 @@ def check_entailment(entailment_model, sent, news_list):
     run_states = entailment_model.predict(data=data_source)
     results = [run_state.run_results for run_state in run_states]
     index = 0
+    result_list = []
     for batch_result in results[0][0]:
         print(batch_result)
         batch_result = np.argmax(batch_result)
-        print(
-            f"source:{data_source[index][1]}, \
-                news:{data_source[index][0]}  \
-                predict={inv_label_map[batch_result]}  \
-                news_url:{news_list[index][1]}"
+        result_list.append(
+            {
+                "source": data_source[index][1],
+                "news": data_source[index][0],
+                "predict": inv_label_map[batch_result],
+                "news_url": news_list[index][1],
+            }
         )
         index += 1
-
+    print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
     paddle.disable_static()
 
 
