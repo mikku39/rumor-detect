@@ -18,7 +18,7 @@ from component import (
 )
 import paddlehub as hub
 from paddlehub.dataset.base_nlp_dataset import BaseNLPDataset
-
+from dotenv import load_dotenv
 
 @dataclass
 class model_template:
@@ -37,6 +37,7 @@ class rumor_detect:
         keyword_limit_num=5,
         news_limit_num=1,
     ):
+        load_dotenv()
         self.enable_summary = enable_summary
         self.news_mode = news_mode
         self.summary_mode = summary_mode
