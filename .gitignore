@@ -1,0 +1,4 @@
+.env
+data/*
+hub_finetune_ckpt/*
+checkpoint/*
