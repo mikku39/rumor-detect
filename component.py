@@ -44,6 +44,12 @@ def google_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
 
 # 查找关键词
 def get_keywords(sent):
+    """
+    通过 jieba.analyse.extract_tags 查找微博文本输出关键词列表。
+
+    Args:
+        row: 一个 str。
+    """
     res = jieba.analyse.extract_tags(sent)
     return res
 

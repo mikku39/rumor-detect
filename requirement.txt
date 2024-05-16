@@ -5,3 +5,5 @@ python-dotenv
 mkdocs
 pymdown-extensions
 mkdocs-material
+mkdocstrings
+"mkdocstrings[python]"

@@ -5,9 +5,14 @@ docs_dir: docs
 
 nav:
   - Home: index.md
-  - Tutorial: tutorial/qaq.md
+  - Tutorial: tutorial/tutorial.md
   - API Reference:
-      - DataStore: reference/qaq.md
+      - 关键字提取: reference/keyword.md
+      - 新闻查找: reference/news.md
+      - 文本概述: reference/summary.md
+      - 文本对比: reference/compare.md
+      - 单独模型判断: reference/model.md
+
 
 theme:
   name: "material"
@@ -17,6 +22,15 @@ theme:
   features:
     - content.code.annotate
 
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - .
+            - component.py
+          load_external_modules: true
 
 markdown_extensions:
   - pymdownx.highlight:
