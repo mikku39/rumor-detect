@@ -1,0 +1,7 @@
+paddlepaddle==2.3.2
+paddlepaddle-gpu==2.3.2
+paddlehub==1.7.1
+python-dotenv
+mkdocs
+pymdown-extensions
+mkdocs-material
