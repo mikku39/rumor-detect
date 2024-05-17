@@ -7,7 +7,8 @@ from bs4 import BeautifulSoup
 import os
 import shutil
 from tqdm import tqdm
-
+import url2io_client
+from url2io_client.rest import ApiException
 # 获取数据
 
 
@@ -58,18 +59,39 @@ def google_search(search_term, **kwargs):
     )
     return []
 
+# 返回bing搜索结果
+def bing_search(search_term, **kwargs):
+    api_key = os.environ.get("BING_KEY")
+    headers = {"Ocp-Apim-Subscription-Key": api_key}
+    headers.update(kwargs)
+    
+    query_params = {"q": search_term, "textDecorations": True, "textFormat": "HTML"}
+    response = requests.get(
+        "https://api.bing.microsoft.com/v7.0/search", headers=headers, params=query_params
+    )
+    response.raise_for_status()
+    bing_data = response.json()
+    if "webPages" in bing_data and "value" in bing_data["webPages"]:
+        return bing_data["webPages"]["value"]
+    print(
+        f"bing搜索查询失败。返回数据为：{bing_data}，KEY为{api_key}"
+    )
+    return []
+
 
 def get_url_ctx(url):
-    conn = http.client.HTTPSConnection("apis.tianapi.com")  # 接口域名
-    params = urllib.parse.urlencode({"key": os.environ.get("TX_KEY"), "url": url})
-    headers = {"Content-type": "application/x-www-form-urlencoded"}
-    conn.request("POST", "/htmltext/index", params, headers)
-    tianapi = conn.getresponse()
-    result = tianapi.read()
-    data = result.decode("utf-8")
-    news_data = json.loads(data)
-    return news_data
-
+    configuration = url2io_client.Configuration()
+    configuration.host = 'http://url2api.applinzi.com'
+    configuration.api_key['token'] = os.environ.get("URL2IO_KEY")
+    api_instance = url2io_client.URL2ArticleApi(url2io_client.ApiClient(configuration))
+    fields=['text']
+    try:
+    # 网页结构智能解析 HTTP Get 接口
+        api_response = api_instance.get_article(url, fields=fields)
+        return {"code":200, "result":api_response.text}
+    except ApiException as e:
+        print(f"查找网页{url},出错：{e}")
+        return {"code":403, "err_msg":e}
 
 def beauty_ctx(ctx):
     soup = BeautifulSoup(ctx, "lxml")
@@ -83,7 +105,11 @@ def get_news_list(data_list):
         news_data = get_url_ctx(data["url"])
         if news_data["code"] == 200:
             news_list.append(
-                (data["title"], data["url"], beauty_ctx(news_data["result"]["content"]))
+                (data["title"], data["url"], beauty_ctx(news_data["result"]))
+            )
+        else:
+            news_list.append(
+                (data["title"], data["url"], data["title"])
             )
     return news_list
 
@@ -174,3 +200,36 @@ def check_and_download(path, url):
         print(f"下载完成，文件已保存到 {path}")
     else:
         print(f"文件 {path} 已存在，无需下载。")
+
+
+def noop_init():
+    pass
+
+#截断到最大字节限制
+def truncate_bytes(string, max_bytes=512, encoding='utf-8'):
+    byte_str = string.encode(encoding)
+    if len(byte_str) <= max_bytes:
+        return string
+    truncated_str = byte_str[:max_bytes].decode(encoding, 'ignore')
+    return truncated_str
+
+def baidu_summary_single_infer(text):
+    url = "https://aip.baidubce.com/oauth/2.0/token"
+    params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_KEY"), "client_secret": os.environ.get("BAIDU_SECRET")}
+    token = str(requests.post(url, params=params).json().get("access_token"))
+    url = "https://aip.baidubce.com/rpc/2.0/nlp/v1/news_summary?charset=UTF-8&access_token=" + token
+    payload = json.dumps({
+        "content": text,
+        "max_summary_len": 50
+    })
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    
+    response = requests.request("POST", url, headers=headers, data=payload)
+    result = response.json()
+    if "error_code" in result:
+        print(f"使用百度短文本比较的时候出错：{result}")
+        return 
+    return result["summary"]

@@ -1,10 +1,15 @@
+import requests
 from tools.data_tools import (
+    bing_search,
     data2np,
+    get_default_path,
+    truncate_bytes,
     tx_search,
     get_news_list,
     generate_data_source,
     generate_data,
     google_search,
+    baidu_summary_single_infer,
 )
 import jieba.analyse
 from paddlenlp.datasets import MapDataset
@@ -16,7 +21,9 @@ import numpy as np
 from paddlenlp.data import Pad, Tuple
 from functools import partial
 import tabulate
-
+from paddlenlp.transformers import AutoTokenizer
+import os
+import json
 
 # 返回新闻 list
 def tianxing_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
@@ -42,6 +49,16 @@ def google_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
         google_data = google_data[:news_limit_num]
     return get_news_list(google_data)
 
+def bing_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
+    if len(keyword_list) > keyword_limit_num:
+        keyword_list = keyword_list[:keyword_limit_num]
+    keyword_str = " ".join(keyword_list)
+    bing_data = bing_search(keyword_str)
+    for data in bing_data:
+        data["title"] = data["name"]
+    if len(bing_data) > news_limit_num:
+        bing_data = bing_data[:news_limit_num]
+    return get_news_list(bing_data)
 
 # 查找关键词
 def get_keywords(sent):
@@ -55,8 +72,10 @@ def get_keywords(sent):
     return res
 
 
-def pegasus_group_infer(summary_model, summary_tokenizer, sent, news_list):
+def pegasus_group_infer(summary_model, sent, news_list):
     summary_list = []
+    path = f"{get_default_path()}/pegasus_checkpoints"
+    summary_tokenizer = AutoTokenizer.from_pretrained(path)
     for news in news_list:
         text = news[2]
         summary_text = pegasus_single_infer(text, summary_model, summary_tokenizer)
@@ -64,6 +83,14 @@ def pegasus_group_infer(summary_model, summary_tokenizer, sent, news_list):
     sent = pegasus_single_infer(sent, summary_model, summary_tokenizer)
     return sent, summary_list
 
+def baidu_summary_group_infer(summary_model, sent, news_list):
+    summary_list = []
+    for news in news_list:
+        text = news[2]
+        summary_text = baidu_summary_single_infer(text)
+        summary_list.append((news[0], news[1], summary_text))
+    sent = baidu_summary_single_infer(sent)
+    return sent, summary_list
 
 def check_match(match_model, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言"}
@@ -102,6 +129,7 @@ def check_match(match_model, sent, news_list):
     result_list = []
     for idx, y_pred in enumerate(y_preds):
         text_pair = test_ds[idx]
+        text_pair["score"] = y_probs[idx][y_pred]
         text_pair["label"] = inv_label_map[y_pred]
         result_list.append(text_pair)
     print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
@@ -117,19 +145,51 @@ def check_entailment(entailment_model, sent, news_list):
     result_list = []
     for batch_result in results[0][0]:
         print(batch_result)
+        max_score = batch_result[np.argmax(batch_result)]
         batch_result = np.argmax(batch_result)
         result_list.append(
             {
                 "source": data_source[index][1],
                 "news": data_source[index][0],
-                "predict": inv_label_map[batch_result],
                 "news_url": news_list[index][1],
+                "score": max_score,
+                "predict": inv_label_map[batch_result],
             }
         )
         index += 1
     print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
     paddle.disable_static()
 
+def baidu_compare(model, sent, news_list):
+    inv_label_map = {0: "谣言", 1: "非谣言"}
+    url = "https://aip.baidubce.com/oauth/2.0/token"
+    params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_KEY"), "client_secret": os.environ.get("BAIDU_SECRET")}
+    token = str(requests.post(url, params=params).json().get("access_token"))
+    url = "https://aip.baidubce.com/rpc/2.0/nlp/v2/simnet?charset=UTF-8&access_token=" + token
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    result_list = []
+    for news in news_list:
+        payload = json.dumps({
+            "text_1": truncate_bytes(sent),
+            "text_2": truncate_bytes(news[2]),
+        })
+        response = requests.request("POST", url, headers=headers, data=payload)
+        result = response.json()
+        if "error_code" in result:
+            print(f"使用百度短文本比较的时候出错：{result}")
+            return 
+        result_list.append({
+            "source": sent,
+            "news": news[2],
+            "news_url": news[1],
+            "score": result['score'],
+            "predict": inv_label_map[result['score'] > 0.6],
+        })
+    print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
+    
 
 def cnn_infer(model, sent):
     lab = ["谣言", "非谣言"]

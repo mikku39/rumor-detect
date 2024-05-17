@@ -1,6 +1,15 @@
 import numpy as np
 import paddle
 
+from tools.data_tools import check_and_download, get_default_path
+from paddlenlp.transformers import AutoModelForConditionalGeneration
+import paddle
+import paddlenlp
+import paddle.fluid as fluid
+from model import CNN, PointwiseMatching
+
+from paddlehub.dataset.base_nlp_dataset import BaseNLPDataset
+import paddlehub as hub
 # 文本的最大长度
 max_source_length = 128
 # 摘要的最大长度
@@ -68,3 +77,109 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     else:
         return input_ids, token_type_ids
 
+def pegasus_init():
+    path = f"{get_default_path()}/pegasus_checkpoints"
+    url = "https://github.com/mikku39/rumor-detect/releases/download/v0.0.1/pegasus_checkpoints.zip"
+    check_and_download(path, url)
+    summary_model = AutoModelForConditionalGeneration.from_pretrained(path)
+    return summary_model
+
+def match_init():
+    # 语义匹配网络
+    pretrained_model = paddlenlp.transformers.ErnieGramModel.from_pretrained(
+        "ernie-gram-zh"
+    )
+    compare_model = PointwiseMatching(pretrained_model)
+    model_path = f"{get_default_path()}/point_wise.pdparams"
+    url = "https://github.com/mikku39/rumor-detect/releases/download/v0.0.1/point_wise.pdparams"
+    check_and_download(model_path, url)
+    state_dict = paddle.load(model_path)
+    compare_model.set_dict(state_dict)
+    return compare_model
+
+def entailment_init():
+    paddle.enable_static()
+    module = hub.Module("bert_chinese_L-12_H-768_A-12")
+
+    path = f"{get_default_path()}/hub_finetune_ckpt"
+    url = "https://github.com/mikku39/rumor-detect/releases/download/v0.0.1/hub_finetune_ckpt.zip"
+    check_and_download(path, url)
+    class MyNews(BaseNLPDataset):
+        def __init__(self):
+            # 数据集存放位置
+            dict_path = f"{get_default_path()}/dict.txt"
+            dict_url = "https://github.com/mikku39/rumor-detect/releases/download/v0.0.1/dict.txt"
+            check_and_download(dict_path, dict_url)
+            super(MyNews, self).__init__(
+                base_path=get_default_path(),
+                train_file="dict.txt",
+                dev_file="dict.txt",
+                test_file="dict.txt",
+                train_file_with_header=True,
+                dev_file_with_header=True,
+                test_file_with_header=True,
+                label_list=["contradiction", "entailment", "neutral"],
+            )
+
+    dataset = MyNews()
+    reader = hub.reader.ClassifyReader(
+        dataset=dataset,
+        vocab_path=module.get_vocab_path(),
+        sp_model_path=module.get_spm_path(),
+        word_dict_path=module.get_word_dict_path(),
+        max_seq_len=128,
+    )
+
+    strategy = hub.AdamWeightDecayStrategy(
+        weight_decay=0.001,
+        warmup_proportion=0.1,
+        learning_rate=5e-5,
+    )
+
+    config = hub.RunConfig(
+        use_cuda=True,
+        num_epoch=2,
+        batch_size=32,
+        checkpoint_dir=path,
+        strategy=strategy,
+    )
+    paddle.enable_static()
+    inputs, outputs, program = module.context(trainable=True, max_seq_len=128)
+    # 配置fine-tune任务
+    # Use "pooled_output" for classification tasks on an entire sentence.
+    pooled_output = outputs["pooled_output"]
+
+    feed_list = [
+        inputs["input_ids"].name,
+        inputs["position_ids"].name,
+        inputs["segment_ids"].name,
+        inputs["input_mask"].name,
+    ]
+
+    compare_model = hub.TextClassifierTask(
+        data_reader=reader,
+        feature=pooled_output,
+        feed_list=feed_list,
+        num_classes=dataset.num_labels,
+        config=config,
+        metrics_choices=["acc"],
+    )
+    compare_model.max_train_steps = 9999
+    paddle.disable_static()
+    return compare_model
+
+def cnn_init():
+    # cnn模型
+    judge_model = CNN(batch_size=1)
+    model_path = f"{get_default_path()}/save_dir_9240.pdparams"
+    model_url = "https://github.com/mikku39/rumor-detect/releases/download/v0.0.1/save_dir_9240.pdparams"
+    check_and_download(model_path, model_url)
+    cnn_model, _ = fluid.load_dygraph(model_path)
+    judge_model.load_dict(cnn_model)
+    judge_model.eval()
+    dict_path = f"{get_default_path()}/dict.txt"
+    dict_url = (
+        "https://github.com/mikku39/rumor-detect/releases/download/v0.0.1/dict.txt"
+    )
+    check_and_download(dict_path, dict_url)
+    return judge_model
