@@ -1,5 +1,5 @@
 import requests
-from tools.data_tools import (
+from RumorDetect.tools.data_tools import (
     bing_search,
     data2np,
     get_default_path,
@@ -14,51 +14,63 @@ from tools.data_tools import (
 import jieba.analyse
 from paddlenlp.datasets import MapDataset
 import paddle
-from tools.model_tools import convert_example
+from RumorDetect.tools.model_tools import convert_example, match_infer, pegasus_single_infer
 import paddlenlp
-from tools.model_tools import match_infer, pegasus_single_infer
 import numpy as np
 from paddlenlp.data import Pad, Tuple
 from functools import partial
-import tabulate
 from paddlenlp.transformers import AutoTokenizer
 import os
 import json
 
 # 返回新闻 list
-def tianxing_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
+def tianxing_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_url=["zhihu", "baijiahao"]):
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     tx_data = tx_search(keyword_list)
     if tx_data["code"] != 200:
         return []
     tx_data = tx_data["result"]["newslist"]
+    tx_data = data_ban_url(tx_data, banned_url, news_limit_num)
     if len(tx_data) > news_limit_num:
         tx_data = tx_data[:news_limit_num]
     return get_news_list(tx_data)
 
 
-def google_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
+def google_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_url=["zhihu", "baijiahao"]):
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     keyword_str = " ".join(keyword_list)
     google_data = google_search(keyword_str)
     for data in google_data:
         data["url"] = data["link"]
+    google_data = data_ban_url(google_data, banned_url, news_limit_num)
     if len(google_data) > news_limit_num:
         google_data = google_data[:news_limit_num]
     return get_news_list(google_data)
 
-def bing_find_news(keyword_list, keyword_limit_num=5, news_limit_num=1):
+def bing_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_url=[]):
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     keyword_str = " ".join(keyword_list)
     bing_data = bing_search(keyword_str)
     for data in bing_data:
         data["title"] = data["name"]
+    bing_data = data_ban_url(bing_data, banned_url, news_limit_num)
     if len(bing_data) > news_limit_num:
         bing_data = bing_data[:news_limit_num]
     return get_news_list(bing_data)
+
+def data_ban_url(data, banned_url, news_limit_num):
+    if len(data) < news_limit_num:
+        return data
+    for banned in banned_url:
+        for new in data:
+            if banned in new["url"]:
+                data.remove(new)
+            if len(data) < news_limit_num:
+                return data
+    return data
 
 # 查找关键词
 def get_keywords(sent):
@@ -70,7 +82,6 @@ def get_keywords(sent):
     """
     res = jieba.analyse.extract_tags(sent)
     return res
-
 
 def pegasus_group_infer(summary_model, sent, news_list):
     summary_list = []
@@ -128,12 +139,17 @@ def check_match(match_model, sent, news_list):
     test_ds = MapDataset(data_source)
     result_list = []
     for idx, y_pred in enumerate(y_preds):
-        text_pair = test_ds[idx]
-        text_pair["score"] = y_probs[idx][y_pred]
-        text_pair["label"] = inv_label_map[y_pred]
-        result_list.append(text_pair)
-    print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
-
+        result_list.append(
+            {
+                "source": test_ds[idx]['query'],
+                "news": test_ds[idx]['title'],
+                "news_url": news_list[idx][1],
+                "score": y_probs[idx][1],
+                "predict": inv_label_map[y_pred],
+            }
+        )
+    # print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
+    return result_list
 
 def check_entailment(entailment_model, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言", 2: "不相关"}
@@ -145,20 +161,21 @@ def check_entailment(entailment_model, sent, news_list):
     result_list = []
     for batch_result in results[0][0]:
         print(batch_result)
-        max_score = batch_result[np.argmax(batch_result)]
+        score = batch_result[1]
         batch_result = np.argmax(batch_result)
         result_list.append(
             {
                 "source": data_source[index][1],
                 "news": data_source[index][0],
                 "news_url": news_list[index][1],
-                "score": max_score,
+                "score": score,
                 "predict": inv_label_map[batch_result],
             }
         )
         index += 1
-    print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
+    # print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
     paddle.disable_static()
+    return result_list
 
 def baidu_compare(model, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言"}
@@ -180,7 +197,7 @@ def baidu_compare(model, sent, news_list):
         result = response.json()
         if "error_code" in result:
             print(f"使用百度短文本比较的时候出错：{result}")
-            return 
+            return result_list
         result_list.append({
             "source": sent,
             "news": news[2],
@@ -188,7 +205,8 @@ def baidu_compare(model, sent, news_list):
             "score": result['score'],
             "predict": inv_label_map[result['score'] > 0.6],
         })
-    print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
+    # print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
+    return result_list
     
 
 def cnn_infer(model, sent):
@@ -196,3 +214,4 @@ def cnn_infer(model, sent):
     infer_np_doc = data2np(sent)
     result = model(infer_np_doc)
     print("CNN 模型预测结果为：", lab[np.argmax(result.numpy())])
+    return {"source": sent, "score": result.numpy()[0][1], "predict": lab[np.argmax(result.numpy())]}

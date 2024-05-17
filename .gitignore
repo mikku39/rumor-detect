@@ -3,3 +3,5 @@ data/*
 hub_finetune_ckpt/*
 checkpoint/*
 site/*
+dist/*
+build/*

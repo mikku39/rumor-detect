@@ -1,12 +1,12 @@
 import numpy as np
 import paddle
 
-from tools.data_tools import check_and_download, get_default_path
+from RumorDetect.tools.data_tools import check_and_download, get_default_path
 from paddlenlp.transformers import AutoModelForConditionalGeneration
 import paddle
 import paddlenlp
 import paddle.fluid as fluid
-from model import CNN, PointwiseMatching
+from RumorDetect.model import CNN, PointwiseMatching
 
 from paddlehub.dataset.base_nlp_dataset import BaseNLPDataset
 import paddlehub as hub

@@ -89,7 +89,7 @@ def get_url_ctx(url):
     # 网页结构智能解析 HTTP Get 接口
         api_response = api_instance.get_article(url, fields=fields)
         return {"code":200, "result":api_response.text}
-    except ApiException as e:
+    except Exception as e:
         print(f"查找网页{url},出错：{e}")
         return {"code":403, "err_msg":e}
 

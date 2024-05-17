@@ -8,3 +8,4 @@ mkdocs-material
 mkdocstrings
 "mkdocstrings[python]"
 tabulate
+url2io_client
