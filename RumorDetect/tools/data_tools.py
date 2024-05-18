@@ -31,7 +31,7 @@ def load_data(sentence):
 def tx_search(keyword_list):
     conn = http.client.HTTPSConnection("apis.tianapi.com")  # 接口域名
     params = urllib.parse.urlencode(
-        {"key": os.environ.get("TX_KEY"), "word": keyword_list[0]}
+        {"key": os.environ.get("TJSX_API_KEY"), "word": keyword_list[0]}
     )
     headers = {"Content-type": "application/x-www-form-urlencoded"}
     conn.request("POST", "/generalnews/index", params, headers)
@@ -61,7 +61,7 @@ def google_search(search_term, **kwargs):
 
 # 返回bing搜索结果
 def bing_search(search_term, **kwargs):
-    api_key = os.environ.get("BING_KEY")
+    api_key = os.environ.get("BING_SEARCH_KEY")
     headers = {"Ocp-Apim-Subscription-Key": api_key}
     headers.update(kwargs)
     
@@ -78,6 +78,27 @@ def bing_search(search_term, **kwargs):
     )
     return []
 
+def bing_spider_search(search_term, **kwargs):
+    url = 'https://www.bing.com/search'
+    params = {'q': search_term}
+    response = requests.get(url, params=params)
+    result_list = []
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 查找所有的搜索结果条目
+        results = soup.find_all('li', {'class': 'b_algo'})
+        
+        # 遍历每个结果并提取标题和链接
+        for result in results:
+            result_list.append({
+                'title': result.find('h2').text.strip(),
+                'url': result.find('a')['href']
+            })
+        return result_list
+    else:
+        print('bing_spider Failed to retrieve the content')
+        return []
 
 def get_url_ctx(url):
     configuration = url2io_client.Configuration()
@@ -215,7 +236,7 @@ def truncate_bytes(string, max_bytes=512, encoding='utf-8'):
 
 def baidu_summary_single_infer(text):
     url = "https://aip.baidubce.com/oauth/2.0/token"
-    params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_KEY"), "client_secret": os.environ.get("BAIDU_SECRET")}
+    params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_API_KEY"), "client_secret": os.environ.get("BAIDU_API_SECRET")}
     token = str(requests.post(url, params=params).json().get("access_token"))
     url = "https://aip.baidubce.com/rpc/2.0/nlp/v1/news_summary?charset=UTF-8&access_token=" + token
     payload = json.dumps({

@@ -1,7 +1,7 @@
 from RumorDetect.RumorDetect import rumor_detect
 
 instance = rumor_detect(
-    news_mode=["bing"],
+    news_mode=["google"],
     summary_mode=["ernie_bot"],
     compare_mode=["ernie_bot", "match"],
     judge_mode=["cnn", "ernie_bot"],

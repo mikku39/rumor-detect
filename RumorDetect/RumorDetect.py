@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Callable, List, Dict
 from RumorDetect.component import (
     baidu_match,
     baidu_summary_group_infer,
@@ -14,6 +14,7 @@ from RumorDetect.component import (
     bing_find_news,
     ernie_bot_infer,
     ernie_bot_summary_group_infer,
+    bing_spider_find_news,
 )
 from dotenv import load_dotenv
 from RumorDetect.tools.model_tools import (
@@ -35,36 +36,67 @@ class model_template:
 
 
 class rumor_detect:
+    """
+    这是这个包的核心类，用于进行谣言检测。
+    在初始化时，可以根据配置的参数选择是否自动初始化各模块，以及是否开启关键词提取、概要生成、新闻比较、谣言判断等功能。
+    下面是各个参数的说明：
+
+    参数:
+        
+        auto_init : bool = True # 是否自动初始化各模块
+        enable_keyword : bool = True # 是否开启关键词提取
+        enable_summary : bool = True——是否开启概要生成
+        enable_search_compare : bool = True——是否开启新闻搜索比较功能
+        enable_judge : bool = True——是否开启模型谣言判断功能
+        news_mode : List[str] = ["google"]——新闻搜索模式
+        {
+            "tjsx": 天聚数行API # 需要配置环境变量 TJSX_API_KEY
+            "google": google api搜索 # 需要配置环境变量 CSE_ID 和 CSE_API_KEY
+            "bing": bing api搜索    # 需要配置环境变量 BING_SEARCH_KEY
+            "bing_spider": bing爬虫搜索 # 使用爬虫对bing进行搜索，由于各种限制，返回结果不是特别稳定
+        }
+        summary_mode : List[str] =["pegasus"]——摘要生成模式
+        {
+            "pegasus": 天马模型 # 会自动下载模型到 {$HOME}/tmp
+            "baidu": 使用百度API进行概述 # 需要配置环境变量 BAIDU_API_KEY 和 BAIDU_API_SECRET
+            "ernie_bot": 使用百度ernie大模型进行概述 # 需要配置环境变量 ERNIE_BOT_KEY
+        }
+        compare_mode : List[str] =["entailment"]——新闻比较模式
+        {
+            "entailment": 语义蕴含
+            "match": 语义匹配
+            "baidu": 使用百度API进行比较(最大支持512字节) # 需要配置环境变量 BAIDU_API_KEY 和 BAIDU_API_SECRET
+            "ernie_bot": 使用百度ernie大模型进行比较 # 需要配置环境变量 ERNIE_BOT_KEY 和 ERNIE_BOT_SECRET
+        }
+        judge_mode : List[str] = ["cnn"]——谣言判断模式
+        {
+            "cnn": 使用CNN模型进行判断
+            "ernie_bot": 使用百度ernie大模型进行判断
+        }
+        banned_url : List[str] = ["zhihu", "baijiahao"] # 在新闻搜索中禁止的网站
+        keyword_limit_num : int = 8 # 关键词提取的最大数量
+        news_limit_num : int = 5 # 新闻搜索的最大数量
+    """
     def __init__(
         self,
-        auto_init=True,
-        enable_keyword=True,
-        enable_summary=True,
-        enable_search_compare=True,
-        enable_judge=True,
-        news_mode=["google"],
-        summary_mode=["pegasus"],
-        compare_mode=["entailment"],
-        judge_mode=["cnn"],
-        keyword_limit_num=8,
-        news_limit_num=5,
-        banned_url=["zhihu", "baijiahao"],
+        auto_init : bool = True,
+        enable_keyword : bool = True,
+        enable_summary : bool = True,
+        enable_search_compare : bool = True,
+        enable_judge : bool = True,
+        news_mode : List[str] = ["google"],
+        summary_mode : List[str] =["pegasus"],
+        compare_mode : List[str] =["entailment"],
+        judge_mode : List[str] = ["cnn"],
+        banned_url : List[str] = ["zhihu", "baijiahao"],
+        keyword_limit_num : int = 8,
+        news_limit_num : int = 5,
     ):
         load_dotenv()
-        self.enable_summary = enable_summary
-        self.enable_keyword = enable_keyword
-        self.news_mode = news_mode
-        self.summary_mode = summary_mode
-        self.compare_mode = compare_mode
-        self.judge_mode = judge_mode
-        self.keyword_limit_num = keyword_limit_num
-        self.news_limit_num = news_limit_num
-        self.auto_init = auto_init
+        self.update_params(locals()) 
         self.initialized = False
         self.judge_initialized = False
         self.search_compare_initialized = False
-        self.enable_search_compare = enable_search_compare
-        self.enable_judge = enable_judge
         self.summary_models = None
         self.compare_models = None
         self.judge_models = None
@@ -73,7 +105,6 @@ class rumor_detect:
         self.sent = ""
         self.compare_result = []
         self.judge_result = []
-        self.banned_url = banned_url
         self.lab = ["谣言", "非谣言"]
 
         if len(self.summary_mode) > 1:
@@ -81,9 +112,10 @@ class rumor_detect:
             self.summary_mode = [self.summary_mode[0]]
 
         self.find_news_dict = {  # 多种新闻搜索方式
-            "tianxing": tianxing_find_news,  # 天聚数行API
-            "google": google_find_news,  # google搜索
-            "bing": bing_find_news,  # bing搜索
+            "tjsx": tianxing_find_news,  # 天聚数行API
+            "google": google_find_news,  # google api搜索
+            "bing": bing_find_news,  # bing api搜索
+            "bing_spider": bing_spider_find_news,  # bing爬虫搜索
         }
 
         self.summary_dict = {  # 多种摘要方式
@@ -116,12 +148,18 @@ class rumor_detect:
             "cnn": model_template(init=cnn_init, infer=cnn_infer),  # CNN模型
             "ernie_bot": model_template(
                 init=ernie_bot_init, infer=ernie_bot_infer
-            ),  # 使用百度API进行判断
+            ),  # 使用百度ernie大模型进行判断
         }
 
         if self.auto_init:
             self.init()
 
+    def update_params(self, params: List[Dict[str, str]]):
+        for key, value in params.items():
+            if key != "self":
+                self.__setattr__(key, value)
+
+    # 初始化各模块
     def init(self):
         # 搜索相关新闻并比较的初始化
         if self.enable_search_compare and not self.search_compare_initialized:
@@ -136,6 +174,7 @@ class rumor_detect:
 
         self.initialized = True
 
+    # 运行
     def run(self, sent):
         if not self.initialized:
             print("未初始化,正在按各模块的 mode 配置初始化")
@@ -179,7 +218,9 @@ class rumor_detect:
                             )
                         )
                     )
-                self.compare_result = self.aggregate_compare_result()#将所有模型的结果聚合
+                self.compare_result = (
+                    self.aggregate_compare_result()
+                )  # 将所有模型的结果聚合
                 print("search_compare结果如下：")
                 print(
                     tabulate.tabulate(
@@ -192,10 +233,11 @@ class rumor_detect:
                 self.judge_result.append(
                     self.judge_dict[judge_mode].infer(self.judge_models[idx], self.sent)
                 )
-            self.judge_result = self.aggregate_judge_result()#将所有模型的结果聚合
+            self.judge_result = self.aggregate_judge_result()  # 将所有模型的结果聚合
             print("judge结果如下：")
             print(tabulate.tabulate(self.judge_result, headers="keys", tablefmt="grid"))
 
+    # Debug模式运行 Search_compare功能，以迭代器的方式执行每一步可以查看和修改中间变量
     def debug_run(self, sent):
         if not self.enable_search_compare:
             print("Debug模式只支持新闻比较功能，当前该功能未开启")
@@ -205,15 +247,15 @@ class rumor_detect:
             self.init()
 
         if len(sent) < 15 and self.enable_keyword:
-                print("输入文本长度小于15，令自身为关键词即可")
-                self.enable_keyword = False
-                self.keywords = [self.sent]
+            print("输入文本长度小于15，令自身为关键词即可")
+            self.enable_keyword = False
+            self.keywords = [self.sent]
 
         if self.enable_keyword:
             self.keywords = get_keywords(self.sent)
 
         print(
-            "关键词搜索完毕。查看或修改中间变量请使用函数 self.get_intermediate() 和 self.set_intermediate(key, value)"
+            "关键词搜索完毕。查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
         yield
         self.news_list = []
@@ -226,14 +268,16 @@ class rumor_detect:
                     self.banned_url,
                 )
             )
-        print("新闻搜索完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.set_intermediate(key, value)")
+        print(
+            "新闻搜索完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
+        )
         yield
         if self.enable_summary:
-                    self.sent, self.news_list = self.summary_dict[
-                        self.summary_mode[0]
-                    ].infer(self.summary_models[0], sent, self.news_list)
+            self.sent, self.news_list = self.summary_dict[self.summary_mode[0]].infer(
+                self.summary_models[0], sent, self.news_list
+            )
         print(
-            "概要完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.set_intermediate(key, value)"
+            "概要完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
         print("再次运行即为最终结果")
         yield
@@ -248,36 +292,37 @@ class rumor_detect:
             )
         self.compare_result = self.aggregate_compare_result()
         print("search_compare结果如下：")
-        print(
-            tabulate.tabulate(
-                self.compare_result, headers="keys", tablefmt="grid"
-            )
-        )
+        print(tabulate.tabulate(self.compare_result, headers="keys", tablefmt="grid"))
         print("比较完毕.")
         return
 
-
+    # 聚合 search_compare 功能中多个 compare 函数的结果
     def aggregate_compare_result(self):
         result = [
             {
                 "source": values[0]["source"],
                 "news": values[0]["news"],
                 "news_url": values[0]["news_url"],
-                "scores": dict(zip(self.compare_mode, [value['score'] for value in values])),
-                "final_score": power_mean([value['score'] for value in values]),
+                "scores": dict(
+                    zip(self.compare_mode, [value["score"] for value in values])
+                ),
+                "final_score": power_mean([value["score"] for value in values]),
                 "predict": self.lab[
-                    power_mean([value['score'] for value in values]) > 0.5
+                    power_mean([value["score"] for value in values]) > 0.5
                 ],
             }
             for values in zip(*self.compare_result)
         ]
         return result
-    
+
+    # 聚合 judge 功能中多个 judge 函数的结果
     def aggregate_judge_result(self):
         result = [
             {
                 "source": self.judge_result[0]["source"],
-                "scores": dict(zip(self.judge_mode, [x["score"] for x in self.judge_result])),
+                "scores": dict(
+                    zip(self.judge_mode, [x["score"] for x in self.judge_result])
+                ),
                 "finalscore": power_mean([x["score"] for x in self.judge_result]),
                 "predict": self.lab[
                     power_mean([x["score"] for x in self.judge_result]) > 0.6
@@ -286,6 +331,7 @@ class rumor_detect:
         ]
         return result
 
+    #获取中间变量
     def get_intermediate(self):
         return {
             "sent": self.sent,
@@ -293,9 +339,7 @@ class rumor_detect:
             "keywords": self.keywords,
         }
 
-    def set_intermediate(self, key, value):
-        self.__setattr__(key, value)
-
+    
     def summary_init(self):
         self.summary_models = [self.summary_dict[self.summary_mode[0]].init()]
 

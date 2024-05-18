@@ -5,4 +5,5 @@
 
 # get_keywords
 
-::: component.get_keywords
+::: RumorDetect.component.get_keywords
+

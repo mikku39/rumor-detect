@@ -11,11 +11,16 @@ from RumorDetect.tools.data_tools import (
     google_search,
     baidu_summary_single_infer,
     ernie_bot_summary_single_infer,
+    bing_spider_search,
 )
 import jieba.analyse
 from paddlenlp.datasets import MapDataset
 import paddle
-from RumorDetect.tools.model_tools import convert_example, match_infer, pegasus_single_infer
+from RumorDetect.tools.model_tools import (
+    convert_example,
+    match_infer,
+    pegasus_single_infer,
+)
 import paddlenlp
 import numpy as np
 from paddlenlp.data import Pad, Tuple
@@ -23,9 +28,19 @@ from functools import partial
 from paddlenlp.transformers import AutoTokenizer
 import os
 import json
+from typing import List, Dict
 
-# 返回新闻 list
-def tianxing_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_url=["zhihu", "baijiahao"]):
+
+
+def tianxing_find_news(
+    keyword_list: List[str],
+    keyword_limit_num: int = 8,
+    news_limit_num: int = 5,
+    banned_url: List[str] = [],
+):
+    '''
+        根据关键字列表通过天行数据接口查找新闻
+    '''
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     tx_data = tx_search(keyword_list)
@@ -38,7 +53,15 @@ def tianxing_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, bann
     return get_news_list(tx_data)
 
 
-def google_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_url=["zhihu", "baijiahao"]):
+def google_find_news(
+    keyword_list: List[str],
+    keyword_limit_num: int = 8,
+    news_limit_num: int = 5,
+    banned_url: List[str] = [],
+):
+    '''
+        根据关键字列表通过 Google 接口查找新闻
+    '''
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     keyword_str = " ".join(keyword_list)
@@ -50,7 +73,16 @@ def google_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned
         google_data = google_data[:news_limit_num]
     return get_news_list(google_data)
 
-def bing_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_url=[]):
+
+def bing_find_news(
+    keyword_list: List[str],
+    keyword_limit_num: int = 8,
+    news_limit_num: int = 5,
+    banned_url: List[str] = [],
+):
+    '''
+        根据关键字列表通过 Bing 接口查找新闻
+    '''
     if len(keyword_list) > keyword_limit_num:
         keyword_list = keyword_list[:keyword_limit_num]
     keyword_str = " ".join(keyword_list)
@@ -62,7 +94,39 @@ def bing_find_news(keyword_list, keyword_limit_num=8, news_limit_num=5, banned_u
         bing_data = bing_data[:news_limit_num]
     return get_news_list(bing_data)
 
-def data_ban_url(data, banned_url, news_limit_num):
+
+def bing_spider_find_news(
+    keyword_list: List[str],
+    keyword_limit_num: int = 8,
+    news_limit_num: int = 5,
+    banned_url: List[str] = [],
+):
+    '''
+        根据关键字列表通过 Bing 爬虫接口查找新闻
+        Args:
+            keyword_list: 
+            keyword_limit_num:  
+            news_limit_num:
+            banned_url: 
+    '''
+    if len(keyword_list) > keyword_limit_num:
+        keyword_list = keyword_list[:keyword_limit_num]
+    keyword_str = " ".join(keyword_list)
+    bing_data = bing_spider_search(keyword_str)
+    for data in bing_data:
+        data["title"] = data["name"]
+    bing_data = data_ban_url(bing_data, banned_url, news_limit_num)
+    if len(bing_data) > news_limit_num:
+        bing_data = bing_data[:news_limit_num]
+    return get_news_list(bing_data)
+
+
+def data_ban_url(
+    data: List[Dict[str, str]], banned_url: List[str], news_limit_num: int
+):
+    '''
+        根据 banned_url 列表过滤 data 中的新闻
+    '''
     if len(data) < news_limit_num:
         return data
     for banned in banned_url:
@@ -72,6 +136,7 @@ def data_ban_url(data, banned_url, news_limit_num):
             if len(data) < news_limit_num:
                 return data
     return data
+
 
 # 查找关键词
 def get_keywords(sent):
@@ -84,6 +149,7 @@ def get_keywords(sent):
     res = jieba.analyse.extract_tags(sent)
     return res
 
+
 def pegasus_group_infer(summary_model, sent, news_list):
     summary_list = []
     path = f"{get_default_path()}/pegasus_checkpoints"
@@ -92,10 +158,11 @@ def pegasus_group_infer(summary_model, sent, news_list):
         text = news[2]
         summary_text = pegasus_single_infer(text, summary_model, summary_tokenizer)
         summary_list.append((news[0], news[1], summary_text))
-        
+
     if len(sent) > 20:
         sent = pegasus_single_infer(sent, summary_model, summary_tokenizer)
     return sent, summary_list
+
 
 def baidu_summary_group_infer(summary_model, sent, news_list):
     summary_list = []
@@ -103,11 +170,12 @@ def baidu_summary_group_infer(summary_model, sent, news_list):
         text = news[2]
         summary_text = baidu_summary_single_infer(text)
         summary_list.append((news[0], news[1], summary_text))
-        
+
     if len(sent) > 20:
         sent = baidu_summary_single_infer(sent)
-    
+
     return sent, summary_list
+
 
 def ernie_bot_summary_group_infer(token, sent, news_list):
     summary_list = []
@@ -118,6 +186,7 @@ def ernie_bot_summary_group_infer(token, sent, news_list):
     if len(sent) > 20:
         sent = ernie_bot_summary_single_infer(token, sent)
     return sent, summary_list
+
 
 def check_match(match_model, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言"}
@@ -157,8 +226,8 @@ def check_match(match_model, sent, news_list):
     for idx, y_pred in enumerate(y_preds):
         result_list.append(
             {
-                "source": test_ds[idx]['query'],
-                "news": test_ds[idx]['title'],
+                "source": test_ds[idx]["query"],
+                "news": test_ds[idx]["title"],
                 "news_url": news_list[idx][1],
                 "score": y_probs[idx][1],
                 "predict": inv_label_map[y_pred],
@@ -166,6 +235,7 @@ def check_match(match_model, sent, news_list):
         )
     # print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
     return result_list
+
 
 def check_entailment(entailment_model, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言", 2: "不相关"}
@@ -193,115 +263,137 @@ def check_entailment(entailment_model, sent, news_list):
     paddle.disable_static()
     return result_list
 
+
 def baidu_match(model, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言"}
     url = "https://aip.baidubce.com/oauth/2.0/token"
-    params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_KEY"), "client_secret": os.environ.get("BAIDU_SECRET")}
-    token = str(requests.post(url, params=params).json().get("access_token"))
-    url = "https://aip.baidubce.com/rpc/2.0/nlp/v2/simnet?charset=UTF-8&access_token=" + token
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+    params = {
+        "grant_type": "client_credentials",
+        "client_id": os.environ.get("BAIDU_API_KEY"),
+        "client_secret": os.environ.get("BAIDU_API_SECRET"),
     }
+    token = str(requests.post(url, params=params).json().get("access_token"))
+    url = (
+        "https://aip.baidubce.com/rpc/2.0/nlp/v2/simnet?charset=UTF-8&access_token="
+        + token
+    )
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
     result_list = []
     for news in news_list:
-        payload = json.dumps({
-            "text_1": truncate_bytes(sent),
-            "text_2": truncate_bytes(news[2]),
-        })
+        payload = json.dumps(
+            {
+                "text_1": truncate_bytes(sent),
+                "text_2": truncate_bytes(news[2]),
+            }
+        )
         response = requests.request("POST", url, headers=headers, data=payload)
         result = response.json()
         if "error_code" in result:
             print(f"使用百度短文本比较的时候出错：{result}")
             return result_list
-        result_list.append({
-            "source": sent,
-            "news": news[2],
-            "news_url": news[1],
-            "score": result['score'],
-            "predict": inv_label_map[result['score'] > 0.6],
-        })
+        result_list.append(
+            {
+                "source": sent,
+                "news": news[2],
+                "news_url": news[1],
+                "score": result["score"],
+                "predict": inv_label_map[result["score"] > 0.6],
+            }
+        )
     # print(tabulate.tabulate(result_list, headers="keys", tablefmt="grid"))
     return result_list
 
+
 def ernie_bot_entailment(token, sent, news_list):
     inv_label_map = {0: "谣言", 1: "非谣言"}
-    url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token=" + token
+    url = (
+        "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token="
+        + token
+    )
     result_list = []
     for news in news_list:
-        payload = json.dumps({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "文本A:法国一养殖场发现高致病性禽流感病例\n文本B: 法国火鸡养殖场发现高致病性禽流感病例"
-                }
-            ],
-            "temperature": 0.95,
-            "top_p": 0.8,
-            "penalty_score": 1,
-            "system": "【功能说明】 你是一个高级人工智能助手，专门设计来评估两段文本的关联性和真实性。你的任务是在假定第一段文本（文本A）为真的情况下，分析并给出第二段文本（文本B）为真的置信度。置信度是一个介于0到1之间的数值，高置信度（接近1）表示文本B很可能也是真实的，而低置信度（接近0）则表示文本B很可能是虚假的。  【输入格式要求】  输入必须包含两个独立的文本段落，分别标记为“文本A”和“文本B”。 每段文本应该简洁明了，长度不超过500字。 文本应直接输入，不含任何格式化元素（如HTML标签）或非文本内容。 【操作要求】  验证输入格式符合上述要求。 在确认文本A为真的基础上，使用数据和逻辑分析文本B的真实性。 输出一个形如“【0.xxx】”的置信度数值，表示文本B的真实性。 确保输出仅包含置信度数值，不添加任何解释或其他文本。 【示例输入】 文本A: 乔治·华盛顿是美国的第一任总统。 文本B: 托马斯·杰斐逊是美国的第三任总统。  【示例输出】 【0.999】",
-            "stop": [
-                "】"
-            ],
-            "disable_search": True,
-            "enable_citation": False,
-            "response_format": "text"
-        })
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        
+        payload = json.dumps(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "文本A:法国一养殖场发现高致病性禽流感病例\n文本B: 法国火鸡养殖场发现高致病性禽流感病例",
+                    }
+                ],
+                "temperature": 0.95,
+                "top_p": 0.8,
+                "penalty_score": 1,
+                "system": "【功能说明】 你是一个高级人工智能助手，专门设计来评估两段文本的关联性和真实性。你的任务是在假定第一段文本（文本A）为真的情况下，分析并给出第二段文本（文本B）为真的置信度。置信度是一个介于0到1之间的数值，高置信度（接近1）表示文本B很可能也是真实的，而低置信度（接近0）则表示文本B很可能是虚假的。  【输入格式要求】  输入必须包含两个独立的文本段落，分别标记为“文本A”和“文本B”。 每段文本应该简洁明了，长度不超过500字。 文本应直接输入，不含任何格式化元素（如HTML标签）或非文本内容。 【操作要求】  验证输入格式符合上述要求。 在确认文本A为真的基础上，使用数据和逻辑分析文本B的真实性。 输出一个形如“【0.xxx】”的置信度数值，表示文本B的真实性。 确保输出仅包含置信度数值，不添加任何解释或其他文本。 【示例输入】 文本A: 乔治·华盛顿是美国的第一任总统。 文本B: 托马斯·杰斐逊是美国的第三任总统。  【示例输出】 【0.999】",
+                "stop": ["】"],
+                "disable_search": True,
+                "enable_citation": False,
+                "response_format": "text",
+            }
+        )
+        headers = {"Content-Type": "application/json"}
+
         response = requests.request("POST", url, headers=headers, data=payload)
         result = response.json()
         try:
-            score = float(json.loads(response.text)["result"].strip('【】'))
+            score = float(json.loads(response.text)["result"].strip("【】"))
         except Exception as e:
             print(f"baidu_model_predict_ERROR: {response.text}")
             return result_list
-        result_list.append({
-            "source": sent,
-            "news": news[2],
-            "news_url": news[1],
-            "score": score,
-            "predict": inv_label_map[score > 0.6],
-        })
+        result_list.append(
+            {
+                "source": sent,
+                "news": news[2],
+                "news_url": news[1],
+                "score": score,
+                "predict": inv_label_map[score > 0.6],
+            }
+        )
     return result_list
+
 
 def cnn_infer(model, sent):
     lab = ["谣言", "非谣言"]
     infer_np_doc = data2np(sent)
     result = model(infer_np_doc)
-    result_dict = {"source": sent, "score": result.numpy()[0][1], "predict": lab[np.argmax(result.numpy())]}
+    result_dict = {
+        "source": sent,
+        "score": result.numpy()[0][1],
+        "predict": lab[np.argmax(result.numpy())],
+    }
     print("CNN 模型预测结果为：", result_dict)
     return result_dict
 
+
 def ernie_bot_infer(token, sent):
     lab = ["谣言", "非谣言"]
-    
-    url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token=" + token
-    
-    payload = json.dumps({
-        "messages": [
-            {
-                "role": "user",
-                "content": sent,
-            }
-        ],
-        "temperature": 0.95,
-        "top_p": 0.8,
-        "penalty_score": 1,
-        "system": "【功能说明】 你是一个专门设计来验证信息真实性的人工智能助手，通过结合百度搜索引擎获取的信息来评估输入信息的真实性。你的任务是给出一个介于0到1之间的置信度数值，这个数值反映了输入信息非谣言的概率。高置信度（接近1）表示信息很可能是真实的，低置信度（接近0）表示信息很可能是虚假的。  【操作要求】  用户提供一条信息。 你通过搜索引擎进行搜索，分析搜索结果。 仅返回一个形如“【0.xxx】”的置信度数值，该数值基于搜索结果的相关性和信源的权威性。 不要添加任何解释或其他文本。",
-        "disable_search": False,
-        "enable_citation": False,
-        "response_format": "json"
-    })
-    headers = {
-        'Content-Type': 'application/json'
-    }
-    
+
+    url = (
+        "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token="
+        + token
+    )
+
+    payload = json.dumps(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": sent,
+                }
+            ],
+            "temperature": 0.95,
+            "top_p": 0.8,
+            "penalty_score": 1,
+            "system": "【功能说明】 你是一个专门设计来验证信息真实性的人工智能助手，通过结合百度搜索引擎获取的信息来评估输入信息的真实性。你的任务是给出一个介于0到1之间的置信度数值，这个数值反映了输入信息非谣言的概率。高置信度（接近1）表示信息很可能是真实的，低置信度（接近0）表示信息很可能是虚假的。  【操作要求】  用户提供一条信息。 你通过搜索引擎进行搜索，分析搜索结果。 仅返回一个形如“【0.xxx】”的置信度数值，该数值基于搜索结果的相关性和信源的权威性。 不要添加任何解释或其他文本。",
+            "disable_search": False,
+            "enable_citation": False,
+            "response_format": "json",
+        }
+    )
+    headers = {"Content-Type": "application/json"}
+
     response = requests.request("POST", url, headers=headers, data=payload)
     try:
-        score = float(json.loads(response.text)["result"].strip('【】'))
+        score = float(json.loads(response.text)["result"].strip("【】"))
     except Exception as e:
         print(f"baidu_model_predict_ERROR: {response.text}")
         return {"source": sent, "score": 0.5, "predict": "谣言"}

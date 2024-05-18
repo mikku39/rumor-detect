@@ -7,6 +7,7 @@ nav:
   - Home: index.md
   - Tutorial: tutorial/tutorial.md
   - API Reference:
+      - 主类: reference/rumor_detect.md
       - 关键字提取: reference/keyword.md
       - 新闻查找: reference/news.md
       - 文本概述: reference/summary.md
@@ -29,7 +30,6 @@ plugins:
         python:
           paths:
             - .
-            - component.py
           load_external_modules: true
 
 markdown_extensions:

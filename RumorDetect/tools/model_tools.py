@@ -192,6 +192,6 @@ def ernie_bot_init():
     global ernie_bot_token
     if ernie_bot_token == "":
         url = "https://aip.baidubce.com/oauth/2.0/token"
-        params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_MODEL_KEY"), "client_secret": os.environ.get("BAIDU_MODEL_SECRET")}
+        params = {"grant_type": "client_credentials", "client_id": os.environ.get("ERNIE_BOT_KEY"), "client_secret": os.environ.get("ERNIE_BOT_SECRET")}
         ernie_bot_token = str(requests.post(url, params=params).json().get("access_token"))
     return ernie_bot_token
