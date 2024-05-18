@@ -4,7 +4,6 @@ from RumorDetect.tools.data_tools import (
     data2np,
     get_default_path,
     truncate_bytes,
-    tx_search,
     get_news_list,
     generate_data_source,
     generate_data,
@@ -13,9 +12,9 @@ from RumorDetect.tools.data_tools import (
     ernie_bot_summary_single_infer,
     bing_spider_search,
 )
-import jieba.analyse
 from paddlenlp.datasets import MapDataset
 import paddle
+from RumorDetect.model import BaseNewsModel
 from RumorDetect.tools.model_tools import (
     convert_example,
     match_infer,
@@ -32,122 +31,7 @@ from typing import List, Dict
 
 
 
-def tianxing_find_news(
-    keyword_list: List[str],
-    keyword_limit_num: int = 8,
-    news_limit_num: int = 5,
-    banned_url: List[str] = [],
-):
-    '''
-        根据关键字列表通过天行数据接口查找新闻
-    '''
-    if len(keyword_list) > keyword_limit_num:
-        keyword_list = keyword_list[:keyword_limit_num]
-    tx_data = tx_search(keyword_list)
-    if tx_data["code"] != 200:
-        return []
-    tx_data = tx_data["result"]["newslist"]
-    tx_data = data_ban_url(tx_data, banned_url, news_limit_num)
-    if len(tx_data) > news_limit_num:
-        tx_data = tx_data[:news_limit_num]
-    return get_news_list(tx_data)
 
-
-def google_find_news(
-    keyword_list: List[str],
-    keyword_limit_num: int = 8,
-    news_limit_num: int = 5,
-    banned_url: List[str] = [],
-):
-    '''
-        根据关键字列表通过 Google 接口查找新闻
-    '''
-    if len(keyword_list) > keyword_limit_num:
-        keyword_list = keyword_list[:keyword_limit_num]
-    keyword_str = " ".join(keyword_list)
-    google_data = google_search(keyword_str)
-    for data in google_data:
-        data["url"] = data["link"]
-    google_data = data_ban_url(google_data, banned_url, news_limit_num)
-    if len(google_data) > news_limit_num:
-        google_data = google_data[:news_limit_num]
-    return get_news_list(google_data)
-
-
-def bing_find_news(
-    keyword_list: List[str],
-    keyword_limit_num: int = 8,
-    news_limit_num: int = 5,
-    banned_url: List[str] = [],
-):
-    '''
-        根据关键字列表通过 Bing 接口查找新闻
-    '''
-    if len(keyword_list) > keyword_limit_num:
-        keyword_list = keyword_list[:keyword_limit_num]
-    keyword_str = " ".join(keyword_list)
-    bing_data = bing_search(keyword_str)
-    for data in bing_data:
-        data["title"] = data["name"]
-    bing_data = data_ban_url(bing_data, banned_url, news_limit_num)
-    if len(bing_data) > news_limit_num:
-        bing_data = bing_data[:news_limit_num]
-    return get_news_list(bing_data)
-
-
-def bing_spider_find_news(
-    keyword_list: List[str],
-    keyword_limit_num: int = 8,
-    news_limit_num: int = 5,
-    banned_url: List[str] = [],
-):
-    '''
-        根据关键字列表通过 Bing 爬虫接口查找新闻
-        Args:
-            keyword_list: 
-            keyword_limit_num:  
-            news_limit_num:
-            banned_url: 
-    '''
-    if len(keyword_list) > keyword_limit_num:
-        keyword_list = keyword_list[:keyword_limit_num]
-    keyword_str = " ".join(keyword_list)
-    bing_data = bing_spider_search(keyword_str)
-    for data in bing_data:
-        data["title"] = data["name"]
-    bing_data = data_ban_url(bing_data, banned_url, news_limit_num)
-    if len(bing_data) > news_limit_num:
-        bing_data = bing_data[:news_limit_num]
-    return get_news_list(bing_data)
-
-
-def data_ban_url(
-    data: List[Dict[str, str]], banned_url: List[str], news_limit_num: int
-):
-    '''
-        根据 banned_url 列表过滤 data 中的新闻
-    '''
-    if len(data) < news_limit_num:
-        return data
-    for banned in banned_url:
-        for new in data:
-            if banned in new["url"]:
-                data.remove(new)
-            if len(data) < news_limit_num:
-                return data
-    return data
-
-
-# 查找关键词
-def get_keywords(sent):
-    """
-    通过 jieba.analyse.extract_tags 查找微博文本输出关键词列表。
-
-    Args:
-        row: 一个 str。
-    """
-    res = jieba.analyse.extract_tags(sent)
-    return res
 
 
 def pegasus_group_infer(summary_model, sent, news_list):

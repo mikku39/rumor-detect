@@ -3,20 +3,16 @@ from typing import Callable, List, Dict
 from RumorDetect.component import (
     baidu_match,
     baidu_summary_group_infer,
-    get_keywords,
     pegasus_group_infer,
     check_match,
     cnn_infer,
     check_entailment,
     ernie_bot_entailment,
-    tianxing_find_news,
-    google_find_news,
-    bing_find_news,
     ernie_bot_infer,
     ernie_bot_summary_group_infer,
-    bing_spider_find_news,
 )
 from dotenv import load_dotenv
+from RumorDetect.model import BaseNewsModel
 from RumorDetect.tools.model_tools import (
     cnn_init,
     entailment_init,
@@ -24,9 +20,15 @@ from RumorDetect.tools.model_tools import (
     pegasus_init,
     ernie_bot_init,
 )
-from RumorDetect.tools.data_tools import noop_init, power_mean
+from RumorDetect.tools.data_tools import noop_init, power_mean, get_keywords
 from collections import Counter
 import tabulate
+from RumorDetect.modules.news_module import (
+    TJSXNewsModel,
+    GoogleNewsModel,
+    BingNewsModel,
+    BingSpiderNewsModel,
+)
 
 
 @dataclass
@@ -97,6 +99,7 @@ class rumor_detect:
         self.initialized = False
         self.judge_initialized = False
         self.search_compare_initialized = False
+        self.news_models = None
         self.summary_models = None
         self.compare_models = None
         self.judge_models = None
@@ -112,10 +115,10 @@ class rumor_detect:
             self.summary_mode = [self.summary_mode[0]]
 
         self.find_news_dict = {  # 多种新闻搜索方式
-            "tjsx": tianxing_find_news,  # 天聚数行API
-            "google": google_find_news,  # google api搜索
-            "bing": bing_find_news,  # bing api搜索
-            "bing_spider": bing_spider_find_news,  # bing爬虫搜索
+            "tjsx": TJSXNewsModel,  # 天聚数行API
+            "google": GoogleNewsModel,  # google api搜索
+            "bing": BingNewsModel,  # bing api搜索
+            "bing_spider": BingSpiderNewsModel,  # bing爬虫搜索
         }
 
         self.summary_dict = {  # 多种摘要方式
@@ -163,6 +166,7 @@ class rumor_detect:
     def init(self):
         # 搜索相关新闻并比较的初始化
         if self.enable_search_compare and not self.search_compare_initialized:
+            self.news_init()
             if self.enable_summary:
                 self.summary_init()
             self.compare_init()
@@ -192,9 +196,9 @@ class rumor_detect:
 
             print(f"关键字为{self.keywords}")
             self.news_list = []
-            for news_mode in self.news_mode:
+            for news_model in self.news_models:
                 self.news_list.extend(
-                    self.find_news_dict[news_mode](
+                    news_model.find_news(
                         self.keywords,
                         self.keyword_limit_num,
                         self.news_limit_num,
@@ -339,7 +343,9 @@ class rumor_detect:
             "keywords": self.keywords,
         }
 
-    
+    def news_init(self):
+        self.news_models =[self.find_news_dict[news_mode]() for news_mode in self.news_mode]
+        
     def summary_init(self):
         self.summary_models = [self.summary_dict[self.summary_mode[0]].init()]
 
@@ -366,7 +372,10 @@ class rumor_detect:
         return self.judge_dict.keys()
 
     def add_news_mode(self, key, value):
-        self.find_news_dict[key] = value
+        if issubclass(value, BaseNewsModel):
+            self.find_news_dict[key] = value
+        else:
+            print("请传入正确的新闻模型，必须是BaseNewsModel的子类")
 
     def add_summary_mode(self, key, value):
         self.summary_dict[key] = value

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Dict, List
 import http.client, json, urllib
 import numpy as np
 from paddle.fluid.dygraph.base import to_variable
@@ -9,6 +10,7 @@ import shutil
 from tqdm import tqdm
 import url2io_client
 from url2io_client.rest import ApiException
+import jieba.analyse
 # 获取数据
 
 
@@ -288,3 +290,31 @@ def ernie_bot_summary_single_infer(token, text):
 ##对数平均
 def power_mean(values, p=3):
     return np.power(np.mean(np.power(values, p)), 1/p)
+
+def data_ban_url(
+    data: List[Dict[str, str]], banned_url: List[str], news_limit_num: int
+):
+    '''
+        根据 banned_url 列表过滤 data 中的新闻
+    '''
+    if len(data) < news_limit_num:
+        return data
+    for banned in banned_url:
+        for new in data:
+            if banned in new["url"]:
+                data.remove(new)
+            if len(data) < news_limit_num:
+                return data
+    return data
+
+
+# 查找关键词
+def get_keywords(sent):
+    """
+    通过 jieba.analyse.extract_tags 查找微博文本输出关键词列表。
+
+    Args:
+        row: 一个 str。
+    """
+    res = jieba.analyse.extract_tags(sent)
+    return res
