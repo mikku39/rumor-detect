@@ -1,26 +1,13 @@
-from dataclasses import dataclass
-from typing import Callable, List, Dict
-from RumorDetect.component import (
-    baidu_match,
-    baidu_summary_group_infer,
-    pegasus_group_infer,
-    check_match,
-    cnn_infer,
-    check_entailment,
-    ernie_bot_entailment,
-    ernie_bot_infer,
-    ernie_bot_summary_group_infer,
-)
+from typing import List, Dict
 from dotenv import load_dotenv
-from RumorDetect.model import BaseNewsModel
-from RumorDetect.tools.model_tools import (
-    cnn_init,
-    entailment_init,
-    match_init,
-    pegasus_init,
-    ernie_bot_init,
+from RumorDetect.model import (
+    BaseNewsModel,
+    BaseSummaryModel,
+    BaseCompareModel,
+    BaseJudgeModel,
 )
-from RumorDetect.tools.data_tools import noop_init, power_mean, get_keywords
+from RumorDetect.tools.data_tools import power_mean
+from RumorDetect.component import get_keywords
 from collections import Counter
 import tabulate
 from RumorDetect.modules.news_module import (
@@ -29,12 +16,21 @@ from RumorDetect.modules.news_module import (
     BingNewsModel,
     BingSpiderNewsModel,
 )
-
-
-@dataclass
-class model_template:
-    init: Callable
-    infer: Callable
+from RumorDetect.modules.summary_module import (
+    PegasusSummaryModel,
+    BaiduSummaryModel,
+    ErnieBotSummaryModel,
+)
+from RumorDetect.modules.compare_module import (
+    MatchingCompareModel,
+    EntailmentCompareModel,
+    BaiduCompareModel,
+    ErnieBotCompareModel,
+)
+from RumorDetect.modules.judge_module import (
+    CNNJudgeModel,
+    ErnieBotJudgeModel,
+)
 
 
 class rumor_detect:
@@ -44,7 +40,7 @@ class rumor_detect:
     下面是各个参数的说明：
 
     参数:
-        
+
         auto_init : bool = True # 是否自动初始化各模块
         enable_keyword : bool = True # 是否开启关键词提取
         enable_summary : bool = True——是否开启概要生成
@@ -79,23 +75,24 @@ class rumor_detect:
         keyword_limit_num : int = 8 # 关键词提取的最大数量
         news_limit_num : int = 5 # 新闻搜索的最大数量
     """
+
     def __init__(
         self,
-        auto_init : bool = True,
-        enable_keyword : bool = True,
-        enable_summary : bool = True,
-        enable_search_compare : bool = True,
-        enable_judge : bool = True,
-        news_mode : List[str] = ["google"],
-        summary_mode : List[str] =["pegasus"],
-        compare_mode : List[str] =["entailment"],
-        judge_mode : List[str] = ["cnn"],
-        banned_url : List[str] = ["zhihu", "baijiahao"],
-        keyword_limit_num : int = 8,
-        news_limit_num : int = 5,
+        auto_init: bool = True,
+        enable_keyword: bool = True,
+        enable_summary: bool = True,
+        enable_search_compare: bool = True,
+        enable_judge: bool = True,
+        news_mode: List[str] = ["google"],
+        summary_mode: List[str] = ["pegasus"],
+        compare_mode: List[str] = ["entailment"],
+        judge_mode: List[str] = ["cnn"],
+        banned_url: List[str] = ["zhihu", "baijiahao"],
+        keyword_limit_num: int = 8,
+        news_limit_num: int = 5,
     ):
         load_dotenv()
-        self.update_params(locals()) 
+        self.update_params(locals())
         self.initialized = False
         self.judge_initialized = False
         self.search_compare_initialized = False
@@ -114,7 +111,7 @@ class rumor_detect:
             print("概要模块只支持单一模式，已自动选择第一个模式")
             self.summary_mode = [self.summary_mode[0]]
 
-        self.find_news_dict = {  # 多种新闻搜索方式
+        self.news_dict = {  # 多种新闻搜索方式
             "tjsx": TJSXNewsModel,  # 天聚数行API
             "google": GoogleNewsModel,  # google api搜索
             "bing": BingNewsModel,  # bing api搜索
@@ -122,36 +119,21 @@ class rumor_detect:
         }
 
         self.summary_dict = {  # 多种摘要方式
-            "pegasus": model_template(
-                init=pegasus_init, infer=pegasus_group_infer
-            ),  # 天马模型
-            "baidu": model_template(
-                init=noop_init, infer=baidu_summary_group_infer
-            ),  # 使用百度API进行概述
-            "ernie_bot": model_template(
-                init=ernie_bot_init, infer=ernie_bot_summary_group_infer
-            ),  # 使用百度ernie大模型进行概述
+            "pegasus": PegasusSummaryModel,  # 天马模型
+            "baidu": BaiduSummaryModel,  # 使用百度API进行概述
+            "ernie_bot": ErnieBotSummaryModel,  # 使用百度ernie大模型进行概述
         }
 
         self.compare_dict = {  # 多种新闻比较方式
-            "entailment": model_template(
-                init=entailment_init, infer=check_entailment
-            ),  # 语义蕴含
-            "match": model_template(init=match_init, infer=check_match),  # 语义匹配
-            "baidu": model_template(
-                init=noop_init,
-                infer=baidu_match,
-            ),  # 使用百度API进行比较(最大支持512字节)
-            "ernie_bot": model_template(
-                init=ernie_bot_init, infer=ernie_bot_entailment
-            ),  # 使用百度ernie大模型进行比较
+            "entailment": EntailmentCompareModel,  # 语义蕴含
+            "match": MatchingCompareModel,  # 语义匹配
+            "baidu": BaiduCompareModel,  # 使用百度API进行比较(最大支持512字节)
+            "ernie_bot": ErnieBotCompareModel,  # 使用百度ernie大模型进行比较
         }
 
         self.judge_dict = {  # 多种模型判断方式
-            "cnn": model_template(init=cnn_init, infer=cnn_infer),  # CNN模型
-            "ernie_bot": model_template(
-                init=ernie_bot_init, infer=ernie_bot_infer
-            ),  # 使用百度ernie大模型进行判断
+            "cnn": CNNJudgeModel,  # CNN模型
+            "ernie_bot": ErnieBotJudgeModel,  # 使用百度ernie大模型进行判断
         }
 
         if self.auto_init:
@@ -209,18 +191,14 @@ class rumor_detect:
                 print("未找到相关新闻")
             else:
                 if self.enable_summary:
-                    self.sent, self.news_list = self.summary_dict[
-                        self.summary_mode[0]
-                    ].infer(self.summary_models[0], sent, self.news_list)
+                    self.sent, self.news_list = self.summary_models[0].get_summary(
+                        sent, self.news_list
+                    )
                 print(self.news_list)
                 self.compare_result = []
-                for idx, compare_mode in enumerate(self.compare_mode):
+                for compare_model in self.compare_models:
                     self.compare_result.append(
-                        (
-                            self.compare_dict[compare_mode].infer(
-                                self.compare_models[idx], self.sent, self.news_list
-                            )
-                        )
+                        (compare_model.compare(self.sent, self.news_list))
                     )
                 self.compare_result = (
                     self.aggregate_compare_result()
@@ -233,9 +211,9 @@ class rumor_detect:
                 )
         if self.enable_judge:
             self.judge_result = []
-            for idx, judge_mode in enumerate(self.judge_mode):
+            for judge_model in self.judge_models:
                 self.judge_result.append(
-                    self.judge_dict[judge_mode].infer(self.judge_models[idx], self.sent)
+                    judge_model.judge(self.sent)
                 )
             self.judge_result = self.aggregate_judge_result()  # 将所有模型的结果聚合
             print("judge结果如下：")
@@ -265,7 +243,7 @@ class rumor_detect:
         self.news_list = []
         for news_mode in self.news_mode:
             self.news_list.extend(
-                self.find_news_dict[news_mode](
+                self.news_dict[news_mode](
                     self.keywords,
                     self.keyword_limit_num,
                     self.news_limit_num,
@@ -335,7 +313,7 @@ class rumor_detect:
         ]
         return result
 
-    #获取中间变量
+    # 获取中间变量
     def get_intermediate(self):
         return {
             "sent": self.sent,
@@ -344,23 +322,23 @@ class rumor_detect:
         }
 
     def news_init(self):
-        self.news_models =[self.find_news_dict[news_mode]() for news_mode in self.news_mode]
-        
+        self.news_models = [self.news_dict[news_mode]() for news_mode in self.news_mode]
+
     def summary_init(self):
-        self.summary_models = [self.summary_dict[self.summary_mode[0]].init()]
+        self.summary_models = [self.summary_dict[self.summary_mode[0]]()]
 
     def compare_init(self):
         self.compare_models = [
-            self.compare_dict[compare_mode].init() for compare_mode in self.compare_mode
+            self.compare_dict[compare_mode]() for compare_mode in self.compare_mode
         ]
 
     def judge_init(self):
         self.judge_models = [
-            self.judge_dict[judge_mode].init() for judge_mode in self.judge_mode
+            self.judge_dict[judge_mode]() for judge_mode in self.judge_mode
         ]
 
     def list_available_news_mode(self):
-        return self.find_news_dict.keys()
+        return self.news_dict.keys()
 
     def list_available_summary_mode(self):
         return self.summary_dict.keys()
@@ -373,18 +351,27 @@ class rumor_detect:
 
     def add_news_mode(self, key, value):
         if issubclass(value, BaseNewsModel):
-            self.find_news_dict[key] = value
+            self.news_dict[key] = value
         else:
             print("请传入正确的新闻模型，必须是BaseNewsModel的子类")
 
     def add_summary_mode(self, key, value):
-        self.summary_dict[key] = value
+        if issubclass(value, BaseSummaryModel):
+            self.summary_dict[key] = value
+        else:
+            print("请传入正确的概述模型，必须是BaseSummaryModel的子类")
 
     def add_compare_mode(self, key, value):
-        self.compare_dict[key] = value
+        if issubclass(value, BaseCompareModel):
+            self.compare_dict[key] = value
+        else:
+            print("请传入正确的比较模型，必须是BaseCompareModel的子类")
 
     def add_judge_mode(self, key, value):
-        self.judge_dict[key] = value
+        if issubclass(value, BaseJudgeModel):
+            self.judge_dict[key] = value
+        else:
+            print("请传入正确的判断模型，必须是BaseJudgeModel的子类")
 
     def set_news_mode(self, mode: List[str]):
         if Counter(mode) != Counter(self.news_mode):

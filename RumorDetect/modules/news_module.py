@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 from RumorDetect.model import BaseNewsModel
 from RumorDetect.tools.data_tools import bing_search, bing_spider_search, get_news_list, google_search, tx_search,data_ban_url
 
@@ -15,7 +15,7 @@ class TJSXNewsModel(BaseNewsModel):
         keyword_limit_num: int = 8,
         news_limit_num: int = 5,
         banned_url: List[str] = [],
-    ):
+    ) -> List[Dict[str, str]]:
         '''
             根据关键字列表通过天行数据接口查找新闻
         '''
@@ -43,7 +43,7 @@ class GoogleNewsModel(BaseNewsModel):
         keyword_limit_num: int = 8,
         news_limit_num: int = 5,
         banned_url: List[str] = [],
-    ):
+    ) -> List[Dict[str, str]]:
         '''
             根据关键字列表通过 Google 接口查找新闻
         '''
@@ -72,7 +72,7 @@ class BingNewsModel(BaseNewsModel):
         keyword_limit_num: int = 8,
         news_limit_num: int = 5,
         banned_url: List[str] = [],
-    ):
+    ) -> List[Dict[str, str]]:
         '''
             根据关键字列表通过 Bing 接口查找新闻
         '''
@@ -100,7 +100,7 @@ class BingSpiderNewsModel(BaseNewsModel):
         keyword_limit_num: int = 8,
         news_limit_num: int = 5,
         banned_url: List[str] = [],
-    ):
+    ) -> List[Dict[str, str]]:
         '''
         根据关键字列表通过 Bing 爬虫接口查找新闻
         Args:

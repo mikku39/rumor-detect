@@ -5,5 +5,5 @@
 
 # get_keywords
 
-::: RumorDetect.tools.data_tools.get_keywords
+::: RumorDetect.component.get_keywords
 
