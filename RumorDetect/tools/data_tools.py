@@ -233,3 +233,37 @@ def baidu_summary_single_infer(text):
         print(f"使用百度短文本比较的时候出错：{result}")
         return 
     return result["summary"]
+
+def ernie_bot_summary_single_infer(token, text):
+    url = os.environ["ERIBOT_URL"] + token
+    
+    payload = json.dumps({
+        "messages": [
+            {
+                "role": "user",
+                "content": text[:1024],
+            }
+        ],
+        "temperature": 0.95,
+        "top_p": 0.8,
+        "penalty_score": 1,
+        "system": "【功能说明】 你是一个专为提供文本概述设计的人工智能助手。你的任务是仅从所给文本中提取信息，生成一个简短的概述。在处理过程中，不得搜索或引入任何超出原始文本范围的信息。  【操作要求】  仅从用户提供的文本中分析和提取信息。 生成的概述必须直接基于输入的文本，严禁使用任何非输入文本的信息。 概述不得超过50字，并且必须紧密关联原文内容。 【示例】 如果输入文本是：“全球变暖导致极端天气事件的频率和强度增加，科学家们呼吁更多的气候行动。” 你的输出应该是：“科学家因全球变暖导致极端天气增加呼吁气候行动。”",
+        "disable_search": True,
+        "enable_citation": False,
+        "response_format": "text"
+    })
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = requests.request("POST", url, headers=headers, data=payload)
+        result = json.loads(response.text)["result"]
+    except Exception as e:
+        print(f"使用ErnieBot进行summary的时候出错，截取前50个字符：{e}")
+        return text[:50]
+    return result
+
+
+##对数平均
+def power_mean(values, p=3):
+    return np.power(np.mean(np.power(values, p)), 1/p)

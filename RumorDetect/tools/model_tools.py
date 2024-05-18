@@ -1,5 +1,6 @@
 import numpy as np
 import paddle
+import requests
 
 from RumorDetect.tools.data_tools import check_and_download, get_default_path
 from paddlenlp.transformers import AutoModelForConditionalGeneration
@@ -10,6 +11,8 @@ from RumorDetect.model import CNN, PointwiseMatching
 
 from paddlehub.dataset.base_nlp_dataset import BaseNLPDataset
 import paddlehub as hub
+import os
+
 # 文本的最大长度
 max_source_length = 128
 # 摘要的最大长度
@@ -17,6 +20,7 @@ max_target_length = 64
 # 摘要的最小长度
 min_target_length = 0
 
+ernie_bot_token = ""
 
 # 针对单条文本，生成摘要
 def pegasus_single_infer(text, summary_model, summary_tokenizer):
@@ -183,3 +187,11 @@ def cnn_init():
     )
     check_and_download(dict_path, dict_url)
     return judge_model
+
+def ernie_bot_init():
+    global ernie_bot_token
+    if ernie_bot_token == "":
+        url = "https://aip.baidubce.com/oauth/2.0/token"
+        params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_MODEL_KEY"), "client_secret": os.environ.get("BAIDU_MODEL_SECRET")}
+        ernie_bot_token = str(requests.post(url, params=params).json().get("access_token"))
+    return ernie_bot_token

@@ -1,0 +1,11 @@
+README.md
+setup.py
+RumorDetect/RumorDetect.py
+RumorDetect/__init__.py
+RumorDetect/component.py
+RumorDetect/model.py
+RumorDetect.egg-info/PKG-INFO
+RumorDetect.egg-info/SOURCES.txt
+RumorDetect.egg-info/dependency_links.txt
+RumorDetect.egg-info/requires.txt
+RumorDetect.egg-info/top_level.txt
