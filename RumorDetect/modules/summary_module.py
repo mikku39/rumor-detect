@@ -7,7 +7,7 @@ from RumorDetect.model import BaseSummaryModel
 from RumorDetect.component import check_and_download, get_default_path
 from paddlenlp.transformers import AutoModelForConditionalGeneration
 from paddlenlp.transformers import AutoTokenizer
-from RumorDetect.tools.module_tools import ernie_bot_token
+from RumorDetect.tools import module_tools
 
 
 class PegasusSummaryModel(BaseSummaryModel):
@@ -95,14 +95,14 @@ class ErnieBotSummaryModel(BaseSummaryModel):
         self.init()
 
     def init(self):
-        global ernie_bot_token
-        if ernie_bot_token == "":
+        if module_tools.ernie_bot_token == "":
+            print("ccccccccccccccccccc")
             url = "https://aip.baidubce.com/oauth/2.0/token"
             params = {"grant_type": "client_credentials", "client_id": os.environ.get("ERNIE_BOT_KEY"), "client_secret": os.environ.get("ERNIE_BOT_SECRET")}
             self.token = str(requests.post(url, params=params).json().get("access_token"))
-            ernie_bot_token = self.token
+            module_tools.ernie_bot_token = self.token
         else:
-            self.token = ernie_bot_token
+            self.token = module_tools.ernie_bot_token
 
     def get_summary(self, sent : str, news_list:List[Tuple]) -> Tuple[str, List[Tuple]]: 
         summary_list = []

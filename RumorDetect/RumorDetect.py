@@ -100,7 +100,7 @@ class rumor_detect:
         self.summary_models = None
         self.compare_models = None
         self.judge_models = None
-        self.keyword = []
+        self.keywords = []
         self.news_list = []
         self.sent = ""
         self.compare_result = []
@@ -139,7 +139,7 @@ class rumor_detect:
         if self.auto_init:
             self.init()
 
-    def update_params(self, params: List[Dict[str, str]]):
+    def update_params(self, params: Dict[str, str]):
         for key, value in params.items():
             if key != "self":
                 self.__setattr__(key, value)
@@ -212,15 +212,14 @@ class rumor_detect:
         if self.enable_judge:
             self.judge_result = []
             for judge_model in self.judge_models:
-                self.judge_result.append(
-                    judge_model.judge(self.sent)
-                )
+                self.judge_result.append(judge_model.judge(self.sent))
             self.judge_result = self.aggregate_judge_result()  # 将所有模型的结果聚合
             print("judge结果如下：")
             print(tabulate.tabulate(self.judge_result, headers="keys", tablefmt="grid"))
 
     # Debug模式运行 Search_compare功能，以迭代器的方式执行每一步可以查看和修改中间变量
     def debug_run(self, sent):
+        self.sent = sent
         if not self.enable_search_compare:
             print("Debug模式只支持新闻比较功能，当前该功能未开启")
             return
@@ -236,14 +235,16 @@ class rumor_detect:
         if self.enable_keyword:
             self.keywords = get_keywords(self.sent)
 
+        print(self.keywords)
         print(
             "关键词搜索完毕。查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
+        print(self.keywords)
         yield
         self.news_list = []
-        for news_mode in self.news_mode:
+        for news_model in self.news_models:
             self.news_list.extend(
-                self.news_dict[news_mode](
+                news_model.find_news(
                     self.keywords,
                     self.keyword_limit_num,
                     self.news_limit_num,
@@ -255,8 +256,8 @@ class rumor_detect:
         )
         yield
         if self.enable_summary:
-            self.sent, self.news_list = self.summary_dict[self.summary_mode[0]].infer(
-                self.summary_models[0], sent, self.news_list
+            self.sent, self.news_list = self.summary_models[0].get_summary(
+                sent, self.news_list
             )
         print(
             "概要完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
@@ -264,15 +265,11 @@ class rumor_detect:
         print("再次运行即为最终结果")
         yield
         self.compare_result = []
-        for idx, compare_mode in enumerate(self.compare_mode):
+        for compare_model in self.compare_models:
             self.compare_result.append(
-                (
-                    self.compare_dict[compare_mode].infer(
-                        self.compare_models[idx], self.sent, self.news_list
-                    )
-                )
+                (compare_model.compare(self.sent, self.news_list))
             )
-        self.compare_result = self.aggregate_compare_result()
+        self.compare_result = self.aggregate_compare_result()  # 将所有模型的结果聚合
         print("search_compare结果如下：")
         print(tabulate.tabulate(self.compare_result, headers="keys", tablefmt="grid"))
         print("比较完毕.")

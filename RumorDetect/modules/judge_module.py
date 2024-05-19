@@ -8,7 +8,7 @@ from RumorDetect.model import BaseJudgeModel
 from RumorDetect.tools.data_tools import data2np
 from RumorDetect.component import get_default_path, check_and_download
 from RumorDetect.tools.module_tools import CNN
-from RumorDetect.tools.module_tools import ernie_bot_token
+from RumorDetect.tools import module_tools
 
 class CNNJudgeModel(BaseJudgeModel):
     def __init__(self) -> None:
@@ -45,14 +45,14 @@ class ErnieBotJudgeModel(BaseJudgeModel):
         self.init()
     
     def init(self):
-        global ernie_bot_token
-        if ernie_bot_token == "":
+        if module_tools.ernie_bot_token == "":
+            print("bbbbbbbbbbbbbbb")
             url = "https://aip.baidubce.com/oauth/2.0/token"
             params = {"grant_type": "client_credentials", "client_id": os.environ.get("ERNIE_BOT_KEY"), "client_secret": os.environ.get("ERNIE_BOT_SECRET")}
             self.token = str(requests.post(url, params=params).json().get("access_token"))
-            ernie_bot_token = self.token
+            module_tools.ernie_bot_token = self.token
         else:
-            self.token = ernie_bot_token
+            self.token = module_tools.ernie_bot_token
     
     def judge(self, sent: str) -> Dict:
         lab = ["谣言", "非谣言"]

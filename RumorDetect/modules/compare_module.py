@@ -19,7 +19,7 @@ from RumorDetect.tools.module_tools import PointwiseMatching, convert_example
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import MapDataset
 import paddlehub as hub
-from RumorDetect.tools.module_tools import ernie_bot_token
+from RumorDetect.tools import module_tools
 
 
 class MatchingCompareModel(BaseCompareModel):
@@ -261,8 +261,8 @@ class ErnieBotCompareModel(BaseCompareModel):
         self.init()
 
     def init(self):
-        global ernie_bot_token
-        if ernie_bot_token == "":
+        if module_tools.ernie_bot_token == "":
+            print("aaaaaaaaaaaaaaaa")
             url = "https://aip.baidubce.com/oauth/2.0/token"
             params = {
                 "grant_type": "client_credentials",
@@ -272,9 +272,9 @@ class ErnieBotCompareModel(BaseCompareModel):
             self.token = str(
                 requests.post(url, params=params).json().get("access_token")
             )
-            ernie_bot_token = self.token
+            module_tools.ernie_bot_token = self.token
         else:
-            self.token = ernie_bot_token
+            self.token = module_tools.ernie_bot_token
 
     def compare(self, sent: str, news_list: List[Tuple]) -> List[Dict]:
         inv_label_map = {0: "谣言", 1: "非谣言"}
