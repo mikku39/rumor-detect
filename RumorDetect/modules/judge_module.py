@@ -6,11 +6,15 @@ import paddle.fluid as fluid
 import requests
 from RumorDetect.model import BaseJudgeModel
 from RumorDetect.tools.data_tools import data2np
-from RumorDetect.component import get_default_path, check_and_download
+from RumorDetect.component import get_default_path, check_and_download, get_env
 from RumorDetect.tools.module_tools import CNN
 from RumorDetect.tools import module_tools
 
 class CNNJudgeModel(BaseJudgeModel):
+    '''
+        使用 Text-CNN 模型进行判断。
+        由于没有文本的上下文，因此准确度一般。
+    '''
     def __init__(self) -> None:
         self.init()
         
@@ -41,14 +45,22 @@ class CNNJudgeModel(BaseJudgeModel):
         return result_dict
         
 class ErnieBotJudgeModel(BaseJudgeModel):
+    '''
+        使用百度 ERNIE-Bot 模型进行判断。
+        需要配置环境变量 ERNIE_BOT_KEY 和 ERNIE_BOT_SECRET。
+        由于百度的模型可能会自动联网搜索相关信息，因此准确率较高。
+    '''
     def __init__(self) -> None:
         self.init()
     
     def init(self):
         if module_tools.ernie_bot_token == "":
-            print("bbbbbbbbbbbbbbb")
             url = "https://aip.baidubce.com/oauth/2.0/token"
-            params = {"grant_type": "client_credentials", "client_id": os.environ.get("ERNIE_BOT_KEY"), "client_secret": os.environ.get("ERNIE_BOT_SECRET")}
+            params = {
+                "grant_type": "client_credentials",
+                "client_id": get_env("ERNIE_BOT_KEY"),
+                "client_secret": get_env("ERNIE_BOT_SECRET"),
+            }
             self.token = str(requests.post(url, params=params).json().get("access_token"))
             module_tools.ernie_bot_token = self.token
         else:

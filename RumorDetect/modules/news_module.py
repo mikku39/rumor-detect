@@ -3,6 +3,11 @@ from RumorDetect.model import BaseNewsModel
 from RumorDetect.tools.data_tools import bing_search, bing_spider_search, get_news_list, google_search, tx_search,data_ban_url
 
 class TJSXNewsModel(BaseNewsModel):
+    '''
+        根据天聚数行新闻接口查找新闻。该接口查找到的新闻大致在 china.news站点下。
+        需要注意的是该接口仅会根据第一个关键字进行查找，且返回的新闻数量可能不足 news_limit_num。
+        需要配置环境变量TJSX_API_KEY，获取方式见：https://www.tianapi.com/console/
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -16,9 +21,6 @@ class TJSXNewsModel(BaseNewsModel):
         news_limit_num: int = 5,
         banned_url: List[str] = [],
     ) -> List[Dict[str, str]]:
-        '''
-            根据关键字列表通过天行数据接口查找新闻
-        '''
         if len(keyword_list) > keyword_limit_num:
             keyword_list = keyword_list[:keyword_limit_num]
         tx_data = tx_search(keyword_list)
@@ -31,6 +33,11 @@ class TJSXNewsModel(BaseNewsModel):
         return get_news_list(tx_data)
     
 class GoogleNewsModel(BaseNewsModel):
+    '''
+        根据 Google 搜索接口查找新闻。
+        需要配置环境变量：CSE_API_KEY 和 CSE_ID
+        API KEY 获取方式见：https://programmablesearchengine.google.com/u/1/controlpanel/all
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -44,9 +51,6 @@ class GoogleNewsModel(BaseNewsModel):
         news_limit_num: int = 5,
         banned_url: List[str] = [],
     ) -> List[Dict[str, str]]:
-        '''
-            根据关键字列表通过 Google 接口查找新闻
-        '''
         if len(keyword_list) > keyword_limit_num:
             keyword_list = keyword_list[:keyword_limit_num]
         keyword_str = " ".join(keyword_list)
@@ -60,6 +64,11 @@ class GoogleNewsModel(BaseNewsModel):
 
 
 class BingNewsModel(BaseNewsModel):
+    '''
+        根据 Bing 搜索接口查找新闻。
+        需要配置环境变量：BING_SEARCH_KEY
+        API KEY 获取方式见：https://portal.azure.com/
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -73,9 +82,6 @@ class BingNewsModel(BaseNewsModel):
         news_limit_num: int = 5,
         banned_url: List[str] = [],
     ) -> List[Dict[str, str]]:
-        '''
-            根据关键字列表通过 Bing 接口查找新闻
-        '''
         if len(keyword_list) > keyword_limit_num:
             keyword_list = keyword_list[:keyword_limit_num]
         keyword_str = " ".join(keyword_list)
@@ -88,6 +94,10 @@ class BingNewsModel(BaseNewsModel):
         return get_news_list(bing_data)
     
 class BingSpiderNewsModel(BaseNewsModel):
+    '''
+        使用爬虫，直接向bing发送request请求，获取结果
+        不过由于反爬虫机制，很多时候会被拦截，所以不推荐使用
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -101,14 +111,6 @@ class BingSpiderNewsModel(BaseNewsModel):
         news_limit_num: int = 5,
         banned_url: List[str] = [],
     ) -> List[Dict[str, str]]:
-        '''
-        根据关键字列表通过 Bing 爬虫接口查找新闻
-        Args:
-            keyword_list: 
-            keyword_limit_num:  
-            news_limit_num:
-            banned_url: 
-        '''
         if len(keyword_list) > keyword_limit_num:
             keyword_list = keyword_list[:keyword_limit_num]
         keyword_str = " ".join(keyword_list)

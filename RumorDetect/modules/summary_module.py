@@ -4,13 +4,18 @@ from typing import List, Tuple
 
 import requests
 from RumorDetect.model import BaseSummaryModel
-from RumorDetect.component import check_and_download, get_default_path
+from RumorDetect.component import check_and_download, get_default_path, get_env
 from paddlenlp.transformers import AutoModelForConditionalGeneration
 from paddlenlp.transformers import AutoTokenizer
 from RumorDetect.tools import module_tools
 
 
 class PegasusSummaryModel(BaseSummaryModel):
+    '''
+        根据 Pegasus 天马模型进行新闻概要。
+        该模型权重会自动下载到{HOME}/pegasus_checkpoints。（该模型大小约为1.2G）
+        需要注意目前由默认权重生成的概要质量不是特别稳定。
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -21,7 +26,8 @@ class PegasusSummaryModel(BaseSummaryModel):
         self.summary_model = AutoModelForConditionalGeneration.from_pretrained(path)
         self.summary_tokenizer = AutoTokenizer.from_pretrained(path)
 
-    def get_summary(self, sent : str, news_list:List[Tuple]) -> Tuple[str, List[Tuple]]: 
+    def get_summary(self, sent : str, news_list:List[Tuple]) -> Tuple[str, List[Tuple]]:
+ 
         summary_list = []
         for news in news_list:
             text = news[2]
@@ -51,12 +57,21 @@ class PegasusSummaryModel(BaseSummaryModel):
     
 
 class BaiduSummaryModel(BaseSummaryModel):
+    '''
+        根据百度API进行新闻概要。
+        需要在环境变量中设置BAIDU_API_KEY和BAIDU_API_SECRET。
+        平均测试下来质量一般，和 Pegasus 差不多
+    '''
     def __init__(self) -> None:
         self.init()
 
     def init(self):
         url = "https://aip.baidubce.com/oauth/2.0/token"
-        params = {"grant_type": "client_credentials", "client_id": os.environ.get("BAIDU_API_KEY"), "client_secret": os.environ.get("BAIDU_API_SECRET")}
+        params = {
+            "grant_type": "client_credentials",
+            "client_id": get_env("BAIDU_API_KEY"),
+            "client_secret": get_env("BAIDU_API_SECRET"),
+        }
         self.token = str(requests.post(url, params=params).json().get("access_token"))
         
 
@@ -91,14 +106,23 @@ class BaiduSummaryModel(BaseSummaryModel):
         return result["summary"]
     
 class ErnieBotSummaryModel(BaseSummaryModel):
+    '''
+        根据ErnieBot进行新闻概要。
+        需要在环境变量中设置ERNIE_BOT_KEY和ERNIE_BOT_SECRET。
+        由于使用大语言模型，质量较高。
+    '''
     def __init__(self) -> None:
         self.init()
 
     def init(self):
         if module_tools.ernie_bot_token == "":
-            print("ccccccccccccccccccc")
             url = "https://aip.baidubce.com/oauth/2.0/token"
-            params = {"grant_type": "client_credentials", "client_id": os.environ.get("ERNIE_BOT_KEY"), "client_secret": os.environ.get("ERNIE_BOT_SECRET")}
+            params = {
+                "grant_type": "client_credentials",
+                "client_id": get_env("ERNIE_BOT_KEY"),
+                "client_secret": get_env("ERNIE_BOT_SECRET"),
+            }
+            
             self.token = str(requests.post(url, params=params).json().get("access_token"))
             module_tools.ernie_bot_token = self.token
         else:
@@ -115,7 +139,7 @@ class ErnieBotSummaryModel(BaseSummaryModel):
         return sent, summary_list
     
     def single_infer(self, text : str )->str:
-        url = os.environ["ERIBOT_URL"] + self.token
+        url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token=" + self.token
         payload = json.dumps({
             "messages": [
                 {

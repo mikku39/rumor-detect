@@ -1,9 +1,6 @@
-## 简介
-    关键字搜索
+## 关键字查找模块
 
 ---
+### get_keywords
 
-# get_keywords
-
-::: RumorDetect.component.get_keywords
-
+:::RumorDetect.component.get_keywords

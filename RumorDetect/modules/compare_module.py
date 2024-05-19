@@ -14,7 +14,7 @@ from RumorDetect.tools.data_tools import (
     generate_data_source,
     truncate_bytes,
 )
-from RumorDetect.component import check_and_download, get_default_path
+from RumorDetect.component import check_and_download, get_default_path, get_env
 from RumorDetect.tools.module_tools import PointwiseMatching, convert_example
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import MapDataset
@@ -23,6 +23,13 @@ from RumorDetect.tools import module_tools
 
 
 class MatchingCompareModel(BaseCompareModel):
+    '''
+        使用 Ernie-gram 模型配合 Pointwise匹配进行文本比较
+        比较两个文本的语义是否相同。
+        由于谣言检测更多的情况下是对比微博文本是否是新闻文本的子集。
+        因此概述下来，新闻文本包含微博文本的情况下，两者语义不一定能够相似
+        所以准确率可能不高。
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -110,6 +117,11 @@ class MatchingCompareModel(BaseCompareModel):
 
 
 class EntailmentCompareModel(BaseCompareModel):
+    '''
+        使用 Bert 模型进行文本比较
+        这里主要是训练了文本的蕴含关系。因此我们比较新闻文本是否蕴含了微博文本的信息。
+        准确率中等。
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -211,6 +223,13 @@ class EntailmentCompareModel(BaseCompareModel):
 
 
 class BaiduCompareModel(BaseCompareModel):
+    '''
+        使用百度短文本比较接口进行文本比较
+        由于谣言检测更多的情况下是对比微博文本是否是新闻文本的子集。
+        因此概述下来，新闻文本包含微博文本的情况下，两者语义不一定能够相似
+        所以准确率可能不高。
+        需要配置环境变量：BAIDU_API_KEY 和 BAIDU_API_SECRET
+    '''
     def __init__(self) -> None:
         self.init()
 
@@ -218,8 +237,8 @@ class BaiduCompareModel(BaseCompareModel):
         url = "https://aip.baidubce.com/oauth/2.0/token"
         params = {
             "grant_type": "client_credentials",
-            "client_id": os.environ.get("BAIDU_API_KEY"),
-            "client_secret": os.environ.get("BAIDU_API_SECRET"),
+            "client_id": get_env("BAIDU_API_KEY"),
+            "client_secret": get_env("BAIDU_API_SECRET"),
         }
         self.token = str(requests.post(url, params=params).json().get("access_token"))
 
@@ -257,17 +276,21 @@ class BaiduCompareModel(BaseCompareModel):
 
 
 class ErnieBotCompareModel(BaseCompareModel):
+    '''
+        使用 ErnieBot 模型进行文本比较
+        配置的是文本蕴含的prompt。因此我们比较新闻文本是否蕴含了微博文本的信息。
+        需要配置环境变量：ERNIE_BOT_KEY 和 ERNIE_BOT_SECRET
+    '''
     def __init__(self) -> None:
         self.init()
 
     def init(self):
         if module_tools.ernie_bot_token == "":
-            print("aaaaaaaaaaaaaaaa")
             url = "https://aip.baidubce.com/oauth/2.0/token"
             params = {
                 "grant_type": "client_credentials",
-                "client_id": os.environ.get("ERNIE_BOT_KEY"),
-                "client_secret": os.environ.get("ERNIE_BOT_SECRET"),
+                "client_id": get_env("ERNIE_BOT_KEY"),
+                "client_secret": get_env("ERNIE_BOT_SECRET"),
             }
             self.token = str(
                 requests.post(url, params=params).json().get("access_token")
@@ -289,7 +312,7 @@ class ErnieBotCompareModel(BaseCompareModel):
                     "messages": [
                         {
                             "role": "user",
-                            "content": "文本A:法国一养殖场发现高致病性禽流感病例\n文本B: 法国火鸡养殖场发现高致病性禽流感病例",
+                            "content": f"文本A:{news[2]}\n文本B: {sent}",
                         }
                     ],
                     "temperature": 0.95,

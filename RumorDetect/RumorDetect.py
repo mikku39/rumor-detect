@@ -39,41 +39,19 @@ class rumor_detect:
     在初始化时，可以根据配置的参数选择是否自动初始化各模块，以及是否开启关键词提取、概要生成、新闻比较、谣言判断等功能。
     下面是各个参数的说明：
 
-    参数:
-
-        auto_init : bool = True # 是否自动初始化各模块
-        enable_keyword : bool = True # 是否开启关键词提取
-        enable_summary : bool = True——是否开启概要生成
-        enable_search_compare : bool = True——是否开启新闻搜索比较功能
-        enable_judge : bool = True——是否开启模型谣言判断功能
-        news_mode : List[str] = ["google"]——新闻搜索模式
-        {
-            "tjsx": 天聚数行API # 需要配置环境变量 TJSX_API_KEY
-            "google": google api搜索 # 需要配置环境变量 CSE_ID 和 CSE_API_KEY
-            "bing": bing api搜索    # 需要配置环境变量 BING_SEARCH_KEY
-            "bing_spider": bing爬虫搜索 # 使用爬虫对bing进行搜索，由于各种限制，返回结果不是特别稳定
-        }
-        summary_mode : List[str] =["pegasus"]——摘要生成模式
-        {
-            "pegasus": 天马模型 # 会自动下载模型到 {$HOME}/tmp
-            "baidu": 使用百度API进行概述 # 需要配置环境变量 BAIDU_API_KEY 和 BAIDU_API_SECRET
-            "ernie_bot": 使用百度ernie大模型进行概述 # 需要配置环境变量 ERNIE_BOT_KEY
-        }
-        compare_mode : List[str] =["entailment"]——新闻比较模式
-        {
-            "entailment": 语义蕴含
-            "match": 语义匹配
-            "baidu": 使用百度API进行比较(最大支持512字节) # 需要配置环境变量 BAIDU_API_KEY 和 BAIDU_API_SECRET
-            "ernie_bot": 使用百度ernie大模型进行比较 # 需要配置环境变量 ERNIE_BOT_KEY 和 ERNIE_BOT_SECRET
-        }
-        judge_mode : List[str] = ["cnn"]——谣言判断模式
-        {
-            "cnn": 使用CNN模型进行判断
-            "ernie_bot": 使用百度ernie大模型进行判断
-        }
-        banned_url : List[str] = ["zhihu", "baijiahao"] # 在新闻搜索中禁止的网站
-        keyword_limit_num : int = 8 # 关键词提取的最大数量
-        news_limit_num : int = 5 # 新闻搜索的最大数量
+    Args:
+        auto_init : bool 是否自动初始化各模块
+        enable_keyword : bool 是否开启关键词提取
+        enable_summary : bool 是否开启概要生成
+        enable_search_compare : bool 是否开启新闻搜索比较功能
+        enable_judge : bool 是否开启模型谣言判断功能
+        news_mode : List[str] 新闻搜索模式
+        summary_mode : List[str] 摘要生成模式
+        compare_mode : List[str] 新闻比较模式
+        judge_mode : List[str] 谣言判断模式
+        banned_url : List[str] 在新闻搜索中禁止的网站
+        keyword_limit_num : int 关键词提取的最大数量
+        news_limit_num : int 新闻搜索的最大数量
     """
 
     def __init__(
@@ -83,10 +61,10 @@ class rumor_detect:
         enable_summary: bool = True,
         enable_search_compare: bool = True,
         enable_judge: bool = True,
-        news_mode: List[str] = ["google"],
-        summary_mode: List[str] = ["pegasus"],
-        compare_mode: List[str] = ["entailment"],
-        judge_mode: List[str] = ["cnn"],
+        news_mode: List[str] = ["bing"],
+        summary_mode: List[str] = ["ernie_bot"],
+        compare_mode: List[str] = ["entailment","ernie_bot"],
+        judge_mode: List[str] = ["cnn","ernie_bot"],
         banned_url: List[str] = ["zhihu", "baijiahao"],
         keyword_limit_num: int = 8,
         news_limit_num: int = 5,
@@ -160,15 +138,18 @@ class rumor_detect:
 
         self.initialized = True
 
-    # 运行
+
     def run(self, sent):
+        '''
+            运行谣言检测模型
+        '''
         if not self.initialized:
             print("未初始化,正在按各模块的 mode 配置初始化")
             self.init()
         self.sent = sent
 
         if self.enable_search_compare:
-            if len(sent) < 15 and self.enable_keyword:
+            if len(self.sent) < 15 and self.enable_keyword:
                 print("输入文本长度小于15，令自身为关键词即可")
                 self.enable_keyword = False
                 self.keywords = [self.sent]
@@ -192,7 +173,7 @@ class rumor_detect:
             else:
                 if self.enable_summary:
                     self.sent, self.news_list = self.summary_models[0].get_summary(
-                        sent, self.news_list
+                        self.sent, self.news_list
                     )
                 print(self.news_list)
                 self.compare_result = []
@@ -217,8 +198,10 @@ class rumor_detect:
             print("judge结果如下：")
             print(tabulate.tabulate(self.judge_result, headers="keys", tablefmt="grid"))
 
-    # Debug模式运行 Search_compare功能，以迭代器的方式执行每一步可以查看和修改中间变量
     def debug_run(self, sent):
+        '''
+            Debug模式运行 Search_compare功能，以迭代器的方式执行每一步可以查看和修改中间变量
+        '''
         self.sent = sent
         if not self.enable_search_compare:
             print("Debug模式只支持新闻比较功能，当前该功能未开启")
@@ -227,7 +210,7 @@ class rumor_detect:
             print("未初始化,正在按各模块的 mode 配置初始化")
             self.init()
 
-        if len(sent) < 15 and self.enable_keyword:
+        if len(self.sent) < 15 and self.enable_keyword:
             print("输入文本长度小于15，令自身为关键词即可")
             self.enable_keyword = False
             self.keywords = [self.sent]
@@ -257,7 +240,7 @@ class rumor_detect:
         yield
         if self.enable_summary:
             self.sent, self.news_list = self.summary_models[0].get_summary(
-                sent, self.news_list
+                self.sent, self.news_list
             )
         print(
             "概要完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
@@ -273,7 +256,7 @@ class rumor_detect:
         print("search_compare结果如下：")
         print(tabulate.tabulate(self.compare_result, headers="keys", tablefmt="grid"))
         print("比较完毕.")
-        return
+        yield
 
     # 聚合 search_compare 功能中多个 compare 函数的结果
     def aggregate_compare_result(self):

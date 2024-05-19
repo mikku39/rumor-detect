@@ -1,4 +1,5 @@
 import os
+from typing import List
 import requests
 import jieba.analyse
 import shutil
@@ -24,7 +25,14 @@ def get_default_path():
     return download_path
 
 
-def check_and_download(path, url):
+def check_and_download(path: str, url: str):
+    '''
+        将文件流式下载到path目录，如果文件已存在则跳过。如果文件是zip格式则解压。
+
+        Args:
+            path: 保存路径
+            url: 下载链接
+    '''
     if not os.path.exists(path):
         print(f"文件 {path} 不存在，正在下载...")
         # 发送GET请求
@@ -62,18 +70,35 @@ def check_and_download(path, url):
     else:
         print(f"文件 {path} 已存在，无需下载。")
 
+def get_env(key: str, default: str=None):
+    '''
+    返回环境变量，如果不存在且没有默认值则抛出异常。
+
+    Args:
+        key: 环境变量名
+        default: 默认值
+    '''
+    res = os.environ.get(key)
+    if res is None:
+        res = default
+        if res is None:
+            raise EnvironmentError(f"环境变量 {key} 未设置")
+    return res
 
 def noop_init():
     pass
 
 
 # 查找关键词
-def get_keywords(sent):
+def get_keywords(sent: str) -> List[str]:
     """
     通过 jieba.analyse.extract_tags 查找微博文本输出关键词列表。
 
     Args:
-        row: 一个 str。
+        row: 新闻文本
+
+    Returns:
+        关键词列表
     """
     res = jieba.analyse.extract_tags(sent)
     return res
