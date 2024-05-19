@@ -155,7 +155,7 @@ def beauty_ctx(ctx)->str:
 
 
 # 返回网页内容
-def get_news_list(data_list) -> List[Tuple]:
+def get_news_list(data_list: List[Dict]) -> List[Tuple]:
     '''
         根据每条新闻的url爬取新闻内容，并以此做下一步计算。如果爬不到就直接返回标题
 
