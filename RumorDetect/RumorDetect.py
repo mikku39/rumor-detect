@@ -1,15 +1,16 @@
 from typing import List, Dict
 from dotenv import load_dotenv
 from RumorDetect.model import (
+    BaseKeywordsModel,
     BaseNewsModel,
     BaseSummaryModel,
     BaseCompareModel,
     BaseJudgeModel,
 )
 from RumorDetect.tools.data_tools import power_mean
-from RumorDetect.component import get_keywords
 from collections import Counter
 import tabulate
+from RumorDetect.modules.keywords_module import JiebaKeywordsModule
 from RumorDetect.modules.news_module import (
     TJSXNewsModel,
     GoogleNewsModel,
@@ -61,6 +62,7 @@ class rumor_detect:
         enable_summary: bool = True,
         enable_search_compare: bool = True,
         enable_judge: bool = True,
+        keywords_mode: List[str] = ["jieba"],
         news_mode: List[str] = ["bing"],
         summary_mode: List[str] = ["ernie_bot"],
         compare_mode: List[str] = ["entailment","ernie_bot"],
@@ -74,6 +76,7 @@ class rumor_detect:
         self.initialized = False
         self.judge_initialized = False
         self.search_compare_initialized = False
+        self.keywords_models = None
         self.news_models = None
         self.summary_models = None
         self.compare_models = None
@@ -88,6 +91,10 @@ class rumor_detect:
         if len(self.summary_mode) > 1:
             print("概要模块只支持单一模式，已自动选择第一个模式")
             self.summary_mode = [self.summary_mode[0]]
+            
+        self.keywords_dict = {
+            "jieba": JiebaKeywordsModule,  # 使用jieba提取关键词
+        }
 
         self.news_dict = {  # 多种新闻搜索方式
             "tjsx": TJSXNewsModel,  # 天聚数行API
@@ -126,6 +133,7 @@ class rumor_detect:
     def init(self):
         # 搜索相关新闻并比较的初始化
         if self.enable_search_compare and not self.search_compare_initialized:
+            self.keywords_init()
             self.news_init()
             if self.enable_summary:
                 self.summary_init()
@@ -149,13 +157,9 @@ class rumor_detect:
         self.sent = sent
 
         if self.enable_search_compare:
-            if len(self.sent) < 15 and self.enable_keyword:
-                print("输入文本长度小于15，令自身为关键词即可")
-                self.enable_keyword = False
-                self.keywords = [self.sent]
-
             if self.enable_keyword:
-                self.keywords = get_keywords(self.sent)
+                for keywords_model in self.keywords_models:
+                    self.keywords.extend(keywords_model.get_keywords(self.sent))
 
             print(f"关键字为{self.keywords}")
             self.news_list = []
@@ -209,20 +213,13 @@ class rumor_detect:
         if not self.initialized:
             print("未初始化,正在按各模块的 mode 配置初始化")
             self.init()
-
-        if len(self.sent) < 15 and self.enable_keyword:
-            print("输入文本长度小于15，令自身为关键词即可")
-            self.enable_keyword = False
-            self.keywords = [self.sent]
-
+            
         if self.enable_keyword:
-            self.keywords = get_keywords(self.sent)
-
-        print(self.keywords)
+            for keywords_model in self.keywords_models:
+                self.keywords = self.keywords.extend(keywords_model.get_keywords(self.sent))
         print(
             "关键词搜索完毕。查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
-        print(self.keywords)
         yield
         self.news_list = []
         for news_model in self.news_models:
@@ -300,7 +297,10 @@ class rumor_detect:
             "news_list": self.news_list,
             "keywords": self.keywords,
         }
-
+    
+    def keywords_init(self):
+        self.keywords_models = [self.keywords_dict[key]() for key in self.keywords_mode]
+        
     def news_init(self):
         self.news_models = [self.news_dict[news_mode]() for news_mode in self.news_mode]
 
@@ -317,6 +317,9 @@ class rumor_detect:
             self.judge_dict[judge_mode]() for judge_mode in self.judge_mode
         ]
 
+    def list_available_keywords_mode(self):
+        return self.keywords_dict.keys()
+
     def list_available_news_mode(self):
         return self.news_dict.keys()
 
@@ -328,6 +331,12 @@ class rumor_detect:
 
     def list_available_judge_mode(self):
         return self.judge_dict.keys()
+
+    def add_keywords_mode(self, key, value):
+        if issubclass(value, BaseKeywordsModel):
+            self.keywords_dict[key] = value
+        else:
+            print("请传入正确的关键词模型，必须是BaseKeywordsModel的子类")
 
     def add_news_mode(self, key, value):
         if issubclass(value, BaseNewsModel):
@@ -353,6 +362,11 @@ class rumor_detect:
         else:
             print("请传入正确的判断模型，必须是BaseJudgeModel的子类")
 
+    def set_keywords_mode(self, mode: List[str]):
+        if Counter(mode) != Counter(self.keywords_mode):
+            self.search_compare_initialized = False
+        self.keywords_mode = mode
+    
     def set_news_mode(self, mode: List[str]):
         if Counter(mode) != Counter(self.news_mode):
             self.search_compare_initialized = False

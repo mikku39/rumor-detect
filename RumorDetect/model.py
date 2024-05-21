@@ -1,5 +1,33 @@
 from typing import Dict, List, Tuple
 
+class BaseKeywordsModel:
+    """
+    这是关键字获取模块的基类。用户需要基于该基类实现自己的关键字获取模块。
+    该类的实现需要实现以下方法：
+    1. **init()** -> None: 初始化方法，用于初始化模型。
+    2. **get_keywords**(
+        self,
+        sent: str,
+        keyword_limit_num: int = 8,
+    ) -> List[Dict[str, str]]:
+    """
+    def __init__(self) -> None:
+        self.init()
+        
+    def init(self):
+        raise NotImplementedError()
+    
+    def get_keywords(self, sent: str, keyword_limit_num: int = 8) -> List[str]:
+        """
+        通过 jieba.analyse.extract_tags 查找微博文本输出关键词列表。
+
+        Args:
+            sent: 新闻文本
+            keyword_limit_num: 关键词数量限制
+        Returns:
+            关键词列表
+        """
+        raise NotImplementedError()
 
 class BaseNewsModel:
     """

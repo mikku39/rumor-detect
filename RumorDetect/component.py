@@ -1,7 +1,6 @@
 import os
 from typing import List
 import requests
-import jieba.analyse
 import shutil
 from tqdm import tqdm
 from pathlib import Path
@@ -89,16 +88,3 @@ def noop_init():
     pass
 
 
-# 查找关键词
-def get_keywords(sent: str) -> List[str]:
-    """
-    通过 jieba.analyse.extract_tags 查找微博文本输出关键词列表。
-
-    Args:
-        row: 新闻文本
-
-    Returns:
-        关键词列表
-    """
-    res = jieba.analyse.extract_tags(sent)
-    return res
