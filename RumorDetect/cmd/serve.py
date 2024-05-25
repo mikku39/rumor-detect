@@ -1,9 +1,47 @@
+from contextlib import contextmanager
 import os
 import click
 from flask import Flask, jsonify, render_template, request
+import io
+import sys
+from flask_socketio import SocketIO, emit
+import numpy as np
+
 
 
 app = Flask(__name__, template_folder='/home/mikku/rumor-detect/RumorDetect/cmd/templates')
+socketio = SocketIO(app)
+clients = {}
+
+@socketio.on('connect')
+def on_connect():
+    clients[request.sid] = request.sid  # Store session ID
+
+@socketio.on('disconnect')
+def on_disconnect():
+    clients.pop(request.sid, None)  # Remove session ID
+    
+class StreamToSocketIO(io.StringIO):
+    def __init__(self, emit_event_name, namespace='/', room=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.emit_event_name = emit_event_name
+        self.namespace = namespace
+        self.room = room
+
+    def write(self, value):
+        super().write(value)
+        # Emit the output in real-time to clients
+        # Make sure to emit with the correct namespace and room
+        if self.room:
+            socketio.emit(self.emit_event_name, {'data': value}, namespace=self.namespace, room=self.room)
+        else:
+            socketio.emit(self.emit_event_name, {'data': value}, namespace=self.namespace)
+
+    def flush(self):
+        pass
+
+
+
 
 @app.route('/')
 def home():
@@ -27,9 +65,14 @@ def get_data():
     )
     sent = "狂飙兄弟没有在连云港遇到鬼秤"
     print(input_text)
-    result = instance.run(input_text)
-    # return jsonify({'message': 'Hello from Flask!'})
-    return jsonify({'message': 'Hello from Flask!', 'result': result})
+    original_stdout = sys.stdout  # Keep track of the original stdout
+    try:
+        # Replace sys.stdout with our custom stream
+        sys.stdout = StreamToSocketIO('output')
+        result = instance.run(input_text)
+    finally:
+        sys.stdout = original_stdout  # Restore the original stdout
+    return jsonify({'message': 'Done!'})
 
 @click.group()
 def cli():
@@ -40,7 +83,7 @@ def cli():
 def serve():
     """Command to start the Flask server."""
     print("Serving from:", os.getcwd())
-    app.run(debug=False, port=5000)
+    socketio.run(app, debug=False, port=5000)
 
 if __name__ == '__main__':
     cli()
