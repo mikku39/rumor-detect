@@ -29,12 +29,13 @@ setup(
         "click==8.1.7",
         "MarkupSafe==2.1.5",
         "zipp==3.17.0",
+        "flask",
     ],
-    # entry_points={
-    #     "console_scripts": [
-    #         "algo_pipeline_bundle = algo_metadata_pipeline.pipeline.pipeline_main:pipeline_main",
-    #     ],
-    # },
+    entry_points={
+        "console_scripts": [
+            "RumorDetect = RumorDetect.cmd.serve:cli",
+        ],
+    },
     # scripts=[
     #     "cmd/bin/install_algo_pipeline_runner_configs",
     # ],

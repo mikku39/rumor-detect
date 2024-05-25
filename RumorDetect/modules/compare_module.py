@@ -18,7 +18,6 @@ from RumorDetect.component import check_and_download, get_default_path, get_env
 from RumorDetect.tools.module_tools import PointwiseMatching, convert_example
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import MapDataset
-import paddlehub as hub
 from RumorDetect.tools import module_tools
 
 
@@ -126,6 +125,7 @@ class EntailmentCompareModel(BaseCompareModel):
         self.init()
 
     def init(self):
+        import paddlehub as hub
         paddle.enable_static()
         module = hub.Module("bert_chinese_L-12_H-768_A-12")
 

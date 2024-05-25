@@ -45,13 +45,15 @@ def tx_search(keyword_list):
 
 
 # 返回google搜索结果
-def google_search(search_term, **kwargs):
+def google_search(search_term, banned_url,**kwargs):
     '''
         使用谷歌搜索接口根据关键词搜索新闻，需要配置环境变量 CSE_API_KEY 和 CSE_ID
     '''
     api_key = get_env("CSE_API_KEY")
     cse_id = get_env("CSE_ID")
-    query_params = {"q": search_term, "key": api_key, "cx": cse_id}
+    exclude_query = ' '.join(f'-site:{site}' for site in banned_url)
+    full_query = f'{search_term} {exclude_query}'
+    query_params = {"q": full_query, "key": api_key, "cx": cse_id}
     query_params.update(kwargs)
     response = requests.get(
         "https://www.googleapis.com/customsearch/v1", params=query_params

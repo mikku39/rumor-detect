@@ -54,7 +54,7 @@ class GoogleNewsModel(BaseNewsModel):
         if len(keyword_list) > keyword_limit_num:
             keyword_list = keyword_list[:keyword_limit_num]
         keyword_str = " ".join(keyword_list)
-        google_data = google_search(keyword_str)
+        google_data = google_search(keyword_str, banned_url)
         for data in google_data:
             data["url"] = data["link"]
         google_data = data_ban_url(google_data, banned_url, news_limit_num)

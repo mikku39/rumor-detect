@@ -160,7 +160,8 @@ class rumor_detect:
             if self.enable_keyword:
                 for keywords_model in self.keywords_models:
                     self.keywords.extend(keywords_model.get_keywords(self.sent))
-
+            else:
+                self.keywords = [self.sent]
             print(f"关键字为{self.keywords}")
             self.news_list = []
             for news_model in self.news_models:
@@ -217,6 +218,8 @@ class rumor_detect:
         if self.enable_keyword:
             for keywords_model in self.keywords_models:
                 self.keywords = self.keywords.extend(keywords_model.get_keywords(self.sent))
+        else:
+            self.keywords = [self.sent]
         print(
             "关键词搜索完毕。查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
