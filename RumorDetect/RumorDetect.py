@@ -217,7 +217,7 @@ class rumor_detect:
             
         if self.enable_keyword:
             for keywords_model in self.keywords_models:
-                self.keywords = self.keywords.extend(keywords_model.get_keywords(self.sent))
+                self.keywords.extend(keywords_model.get_keywords(self.sent))
         else:
             self.keywords = [self.sent]
         print(

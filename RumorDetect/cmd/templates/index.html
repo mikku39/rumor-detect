@@ -66,7 +66,7 @@
         }
         .close-btn {
             background: rgba(255, 255, 255, 0);
-            border: 1px solid #ccc; /* Adding a border to the 'X' button */
+            border: 1px solid #ccc;
             font-size: 16px;
             color: #ff0000;
             cursor: pointer;
@@ -84,149 +84,194 @@
             font-size: 14px;
             color: #333;
         }
+        #footerControls {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 10px;
+            position: absolute;
+            bottom: 0;
+            background-color: #f4f4f4;
+            border-top: 1px solid #ccc;
+        }
     </style>
 </head>
 <body>
     <div id="inputContainer">
         <input type="text" id="inputText" placeholder="Enter text here">
-        <button onclick="sendData()">Submit</button>
+        <button onclick="sendData()">运行/下一步</button>
         <div id="output">Output will appear here</div>
     </div>
     <div id="moduleContainer">
         <!-- Modules with labels and styled 'X' buttons will be dynamically generated here -->
-        <script>
-            const moduleLabels = [
-                "关键字获取模块实现选择",
-                "新闻搜索模块实现选择",
-                "新闻摘要模块实现选择",
-                "新闻文本比较模块实现选择",
-                "模型直接判断模块实现选择"
-            ];
-            window.onload = function() {
-                loadModules();
-            };
-
-            function loadModules() {
-                for (let i = 0; i < 5; i++) {
-                    let container = document.createElement('div');
-                    container.className = 'module-container';
-                    let label = document.createElement('label');
-                    label.className = 'module-label';
-                    label.textContent = moduleLabels[i];
-                    container.appendChild(label);
-                    container.innerHTML += `
-                        <select id="select-${i}"></select>
-                        <button onclick="submitOption(${i})">Submit</button>
-                        <div id="tags-${i}"></div>
-                    `;
-                    document.getElementById('moduleContainer').appendChild(container);
-                    loadOptions(i);
-                    loadTags(i);
-                }
-            }
-
-            function loadOptions(index) {
-                fetch('/list', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({index: index})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    let select = document.getElementById(`select-${index}`);
-                    select.innerHTML = data.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-                });
-            }
-
-            function loadTags(index) {
-                fetch('/get', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({index: index})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    let tagsContainer = document.getElementById(`tags-${index}`);
-                    tagsContainer.innerHTML = data.map(tag => `
-                        <span>${tag} <button class="close-btn" onclick="deleteTag('${tag}', ${index})">X</button></span>
-                    `).join('');
-                });
-            }
-
-            function submitOption(index) {
-                let select = document.getElementById(`select-${index}`);
-                let selectedValue = select.value;
-                // 这里可以添加将 selectedValue 发送到后端的逻辑
-                submit(selectedValue, index);
-                console.log('Submitted:', selectedValue);
-            }
-        
-            function submit(selectedValue, index) {
-                console.log('Submitted:', selectedValue, 'from index:', index);
-                // 这里可以添加将 selectedValue 发送到后端的逻辑
-                // 例如，使用 fetch API 发送数据
-                fetch('/submit', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({selectedValue: selectedValue, index: index})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Update response:', data);
-                    // 这里可以添加一些对返回数据的处理逻辑
-                    // 比如重新加载相关部分的 UI 来显示更新
-                })
-                .then(data => {
-                    loadTags(index); // 重新加载标签以显示更新后的列表
-                })
-                .catch(error => console.error('Error:', error));
-            }
-        
-            function deleteTag(tag, index) {
-                fetch('/delete', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({index:index, delete_tag: tag})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    loadTags(index); // 重新加载标签以显示更新后的列表
-                });
-            }
-        
-        
-            var socket = io.connect('http://' + document.domain + ':' + location.port);
-        
-            socket.on('output', function(data) {
-                var outputElement = document.getElementById('output');
-                var formattedData = data.data.replace(/  +/g, '<br>');
-                outputElement.innerHTML += formattedData;
-            });
-        
-            function sendData() {
-                const inputText = document.getElementById('inputText').value;
-                fetch('/api/data', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({text: inputText})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log(data.message);  // Process the final result if needed
-                })
-                .catch(error => console.error('Error:', error));
-            }
-        </script>
     </div>
+    <!-- Footer Controls for extra features -->
+    <div id="footerControls">
+        <label id="footerLabel1">原文本</label>
+        <input type="text" id="inputText1" placeholder="">
+        <label id="footerLabel2">关键字</label>
+        <input type="text" id="inputText2" placeholder="">
+        <label id="footerLabel3">新闻列表</label>
+        <input type="text" id="inputText3" placeholder="">
+        <button onclick="updateData()">更新</button>
+    </div>
+
+    <script>
+        const moduleLabels = [
+            "关键字获取模块实现选择",
+            "新闻搜索模块实现选择",
+            "新闻摘要模块实现选择",
+            "新闻文本比较模块实现选择",
+            "模型直接判断模块实现选择"
+        ];
+
+        window.onload = function() {
+            loadModules();
+        };
+
+        function loadModules() {
+            for (let i = 0; i < 5; i++) {
+                let container = document.createElement('div');
+                container.className = 'module-container';
+                let label = document.createElement('label');
+                label.className = 'module-label';
+                label.textContent = moduleLabels[i];
+                container.appendChild(label);
+                container.innerHTML += `
+                    <select id="select-${i}"></select>
+                    <button onclick="submitOption(${i})">应用</button>
+                    <div id="tags-${i}"></div>
+                `;
+                document.getElementById('moduleContainer').appendChild(container);
+                loadOptions(i);
+                loadTags(i);
+            }
+        }
+
+        function loadOptions(index) {
+            fetch('/list', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({index: index})
+            })
+            .then(response => response.json())
+            .then(data => {
+                let select = document.getElementById(`select-${index}`);
+                select.innerHTML = data.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+            });
+        }
+
+        function loadTags(index) {
+            fetch('/get', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({index: index})
+            })
+            .then(response => response.json())
+            .then(data => {
+                let tagsContainer = document.getElementById(`tags-${index}`);
+                tagsContainer.innerHTML = data.map(tag => `
+                    <span>${tag} <button class="close-btn" onclick="deleteTag('${tag}', ${index})">X</button></span>
+                `).join('');
+            });
+        }
+
+        function submitOption(index) {
+            let select = document.getElementById(`select-${index}`);
+            let selectedValue = select.value;
+            submit(selectedValue, index);
+            console.log('Submitted:', selectedValue);
+        }
+
+        function submit(selectedValue, index) {
+            fetch('/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({selectedValue: selectedValue, index: index})
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Update response:', data);
+                loadTags(index); // Reload tags to show updated list
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function deleteTag(tag, index) {
+            fetch('/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({index: index, delete_tag: tag})
+            })
+            .then(response => response.json())
+            .then(() => {
+                loadTags(index); // Reload tags to show updated list
+            });
+        }
+
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('output', function(data) {
+            var outputElement = document.getElementById('output');
+            var formattedData = data.data.replace(/  +/g, '<br>');
+            outputElement.innerHTML += formattedData;
+        });
+
+        function sendData() {
+            const inputText = document.getElementById('inputText').value;
+            fetch('/api/data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({text: inputText})
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.message);
+                fetchDataAndUpdateInput();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    
+        function fetchDataAndUpdateInput() {
+            fetch('/intermediate')  // 假设这是你的 API URL
+                .then(response => response.json())  // 解析 JSON 响应
+                .then(data => {
+                    document.getElementById('inputText1').value = data.sent;
+                    document.getElementById('inputText2').value = data.keywords;
+                    document.getElementById('inputText3').value = data.news_list;  // 假设响应中有一个 someValue 属性
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        }
+
+        function updateData() {
+            const inputText1 = document.getElementById('inputText1').value;
+            const inputText2 = document.getElementById('inputText2').value;
+            const inputText3 = document.getElementById('inputText3').value;
+            fetch('/debug_update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({sent: inputText1, keywords: inputText2, news_list: inputText3})
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.message);
+                fetchDataAndUpdateInput();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+    </script>
 </body>
 </html>

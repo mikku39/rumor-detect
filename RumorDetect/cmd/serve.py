@@ -8,11 +8,13 @@ from flask_socketio import SocketIO, emit
 import numpy as np
 
 from RumorDetect.RumorDetect import rumor_detect
+import re
 
 app = Flask(
     __name__, template_folder="/home/mikku/rumor-detect/RumorDetect/cmd/templates"
 )
 socketio = SocketIO(app)
+
 clients = {}
 
 
@@ -26,10 +28,7 @@ def on_disconnect():
     clients.pop(request.sid, None)  # Remove session ID
 
 
-# 模拟的数据
-options = ["Option 1", "Option 2", "Option 3", "Option 4"]
-tags = ["Tag 1", "Tag 2", "Tag 3"]
-
+enable_debug = False
 instance = rumor_detect(
     # 参数配置
     news_mode=["bing"],
@@ -38,6 +37,7 @@ instance = rumor_detect(
     judge_mode=["cnn", "ernie_bot"],
     auto_init=False,
 )
+debug_instance = None
 list_list = [
     instance.list_available_keywords_mode,
     instance.list_available_news_mode,
@@ -90,7 +90,8 @@ def delete():
         index = data["index"]
         tmp_list = get_list[index]()
         set_list[index]([i for i in tmp_list if i != delete_tag])
-    return jsonify({"success": True, "tags": tags})
+    return jsonify({"success": True})
+
 
 @app.route("/submit", methods=["POST"])
 def submit():
@@ -102,7 +103,8 @@ def submit():
         tmp_list = get_list[index]()
         tmp_list.append(selectedValue)
         set_list[index](tmp_list)
-    return jsonify({"success": True, "tags": tags})
+    return jsonify({"success": True})
+
 
 class StreamToSocketIO(io.StringIO):
     def __init__(self, emit_event_name, namespace="/", room=None, *args, **kwargs):
@@ -133,40 +135,82 @@ class StreamToSocketIO(io.StringIO):
 
 @app.route("/")
 def home():
-    print("Home directory:", os.getcwd())
     return render_template("index.html")
 
 
 @app.route("/api/data", methods=["POST"])
 def get_data():
-    print("API directory:", os.getcwd())
-    # 假设 RumorDetect 是你的类
-
-    # 创建 RumorDetect 的实例
+    global debug_instance
     data = request.json
     input_text = data["text"]  # 假设传入的文本存储在 'text' 键中
-    sent = "狂飙兄弟没有在连云港遇到鬼秤"
-    print(input_text)
     original_stdout = sys.stdout  # Keep track of the original stdout
-    try:
-        # Replace sys.stdout with our custom stream
-        sys.stdout = StreamToSocketIO("output")
-        result = instance.run(input_text)
-    finally:
-        sys.stdout = original_stdout  # Restore the original stdout
+    if not enable_debug:
+        print(input_text)
+        try:
+            # Replace sys.stdout with our custom stream
+            sys.stdout = StreamToSocketIO("output")
+            result = instance.run(input_text)
+        finally:
+            sys.stdout = original_stdout  # Restore the original stdout
+        return jsonify({"message": "Done!"})
+    else:
+        if debug_instance is None:
+            debug_instance = instance.debug_run(input_text)
+        try:
+            sys.stdout = StreamToSocketIO("output")
+            print("单模块运行中...")
+            next(debug_instance)
+        except StopIteration:
+            print("本次运行结束")
+            debug_instance = None
+        finally:
+            print("单模块运行结束")
+            sys.stdout = original_stdout  # Restore the original stdout
+        return jsonify({"message": "Done!"})
+
+
+@app.route("/intermediate")
+def get_intermediate():
+    result = instance.get_intermediate()
+    return jsonify(
+        {
+            "message": "Done!",
+            "sent": result["sent"],
+            "keywords": result["keywords"],
+            "news_list": result["news_list"],
+        }
+    )
+
+
+@app.route("/debug_update", methods=["POST"])
+def debug_update():
+    data = request.json
+    sent = data["sent"]
+    keywords = data["keywords"]
+    news_list = data["news_list"]
+    keywords_list = re.split(r"[ ,]+", keywords)
+    instance.update_params(
+        {"sent": sent, "keywords": keywords_list, "news_list": news_list}
+    )
     return jsonify({"message": "Done!"})
 
 
 @click.group()
 def cli():
     """Group for the command line tool."""
-    print("CLI Current Working Directory:", os.getcwd())
+    pass
 
 
 @cli.command()
 def serve():
     """Command to start the Flask server."""
-    print("Serving from:", os.getcwd())
+    socketio.run(app, debug=False, port=5000)
+
+
+@cli.command()
+def debug():
+    global enable_debug
+    enable_debug = True
     socketio.run(app, debug=False, port=5000)
 
 
