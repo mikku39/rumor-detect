@@ -47,14 +47,121 @@
             white-space: pre-wrap;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
+        .module-container {
+            margin-bottom: 20px;
+        }
+        select, button, span {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <input type="text" id="inputText" placeholder="Enter text here">
     <button onclick="sendData()">Submit</button>
     <div id="output">Output will appear here</div>
+    <div id="modules">
+        <!-- 四个模块将在这里动态生成 -->
+    </div>
 
     <script>
+
+    window.onload = function() {
+        loadModules();
+    };
+
+    function loadModules() {
+        for (let i = 0; i < 5; i++) {
+            let container = document.createElement('div');
+            container.className = 'module-container';
+            container.innerHTML = `
+                <select id="select-${i}"></select>
+                <button onclick="submitOption(${i})">Submit</button>
+                <div id="tags-${i}"></div>
+            `;
+            document.getElementById('modules').appendChild(container);
+            loadOptions(i);
+            loadTags(i);
+        }
+    }
+
+    function loadOptions(index) {
+        fetch('/list', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({index: index})
+        })
+        .then(response => response.json())
+        .then(data => {
+            let select = document.getElementById(`select-${index}`);
+            select.innerHTML = data.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+        });
+    }
+
+    function loadTags(index) {
+        fetch('/get',{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({index: index})
+        })
+        .then(response => response.json())
+        .then(data => {
+            let tagsContainer = document.getElementById(`tags-${index}`);
+            tagsContainer.innerHTML = data.map(tag => `
+                <span>${tag} <button onclick="deleteTag('${tag}', ${index})">X</button></span>
+            `).join('');
+        });
+    }
+
+    function submitOption(index) {
+        let select = document.getElementById(`select-${index}`);
+        let selectedValue = select.value;
+        // 这里可以添加将 selectedValue 发送到后端的逻辑
+        submit(selectedValue, index);
+        console.log('Submitted:', selectedValue);
+    }
+
+    function submit(selectedValue, index) {
+        console.log('Submitted:', selectedValue, 'from index:', index);
+        // 这里可以添加将 selectedValue 发送到后端的逻辑
+        // 例如，使用 fetch API 发送数据
+        fetch('/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({selectedValue: selectedValue, index: index})
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Update response:', data);
+            // 这里可以添加一些对返回数据的处理逻辑
+            // 比如重新加载相关部分的 UI 来显示更新
+        })
+        .then(data => {
+            loadTags(index); // 重新加载标签以显示更新后的列表
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function deleteTag(tag, index) {
+        fetch('/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({index:index, delete_tag: tag})
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadTags(index); // 重新加载标签以显示更新后的列表
+        });
+    }
+
+
     var socket = io.connect('http://' + document.domain + ':' + location.port);
 
     socket.on('output', function(data) {

@@ -92,7 +92,7 @@ def bing_search(search_term, **kwargs):
 
 def bing_spider_search(search_term, **kwargs):
     '''
-        使用bing搜索接口根据关键词搜索新闻，需要配置环境变量 BING_SEARCH_KEY
+        使用bing爬虫搜索相关新闻
     '''
     url = "https://www.bing.com/search"
     params = {"q": search_term}

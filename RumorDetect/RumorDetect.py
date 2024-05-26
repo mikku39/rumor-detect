@@ -151,7 +151,7 @@ class rumor_detect:
         '''
             运行谣言检测模型
         '''
-        if not self.initialized:
+        if not self.initialized or not self.search_compare_initialized or not self.judge_initialized:
             print("未初始化,正在按各模块的 mode 配置初始化")
             self.init()
         self.sent = sent
@@ -321,19 +321,19 @@ class rumor_detect:
         ]
 
     def list_available_keywords_mode(self):
-        return self.keywords_dict.keys()
+        return list(self.keywords_dict.keys())
 
     def list_available_news_mode(self):
-        return self.news_dict.keys()
+        return list(self.news_dict.keys())
 
     def list_available_summary_mode(self):
-        return self.summary_dict.keys()
+        return list(self.summary_dict.keys())
 
     def list_available_compare_mode(self):
-        return self.compare_dict.keys()
+        return list(self.compare_dict.keys())
 
     def list_available_judge_mode(self):
-        return self.judge_dict.keys()
+        return list(self.judge_dict.keys())
 
     def add_keywords_mode(self, key, value):
         if issubclass(value, BaseKeywordsModel):
@@ -389,6 +389,9 @@ class rumor_detect:
         if Counter(mode) != Counter(self.judge_mode):
             self.judge_initialized = False
         self.judge_mode = mode
+        
+    def get_keywords_mode(self):
+        return self.keywords_mode
 
     def get_news_mode(self):
         return self.news_mode
