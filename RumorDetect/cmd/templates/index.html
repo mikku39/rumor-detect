@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Real-time Processing Output</title>
+    <title>Enhanced Interface with Labels and Styled Buttons</title>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <style>
         body {
@@ -10,18 +10,46 @@
             margin: 0;
             padding: 0;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            flex-direction: row;
             height: 100vh;
             background-color: #f4f4f4;
         }
+        #inputContainer {
+            width: 60%;
+            padding: 20px;
+        }
+        #moduleContainer {
+            width: 40%;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #inputText, #output {
+            width: 100%;
+            margin-bottom: 10px;
+        }
         #inputText {
-            width: 80%;
             padding: 10px;
-            margin: 10px 0;
             border: 2px solid #ccc;
             border-radius: 5px;
+        }
+        #output {
+            height: 600px;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .module-container {
+            background: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        select, button, span {
+            margin-right: 10px;
         }
         button {
             padding: 10px 20px;
@@ -36,155 +64,169 @@
         button:hover {
             background-color: #0056b3;
         }
-        #output {
-            width: 80%;
-            height: 300px;
-            margin-top: 20px;
-            background: white;
-            border: 1px solid #ccc;
-            padding: 10px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        .close-btn {
+            background: rgba(255, 255, 255, 0);
+            border: 1px solid #ccc; /* Adding a border to the 'X' button */
+            font-size: 16px;
+            color: #ff0000;
+            cursor: pointer;
+            padding: 0 5px;
+            display: inline-block;
+            line-height: normal;
+            vertical-align: middle;
         }
-        .module-container {
-            margin-bottom: 20px;
+        .close-btn:hover {
+            background-color: rgba(255, 0, 0, 0.1);
         }
-        select, button, span {
-            margin-right: 10px;
+        .module-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #333;
         }
     </style>
 </head>
 <body>
-    <input type="text" id="inputText" placeholder="Enter text here">
-    <button onclick="sendData()">Submit</button>
-    <div id="output">Output will appear here</div>
-    <div id="modules">
-        <!-- 四个模块将在这里动态生成 -->
+    <div id="inputContainer">
+        <input type="text" id="inputText" placeholder="Enter text here">
+        <button onclick="sendData()">Submit</button>
+        <div id="output">Output will appear here</div>
     </div>
+    <div id="moduleContainer">
+        <!-- Modules with labels and styled 'X' buttons will be dynamically generated here -->
+        <script>
+            const moduleLabels = [
+                "关键字获取模块实现选择",
+                "新闻搜索模块实现选择",
+                "新闻摘要模块实现选择",
+                "新闻文本比较模块实现选择",
+                "模型直接判断模块实现选择"
+            ];
+            window.onload = function() {
+                loadModules();
+            };
 
-    <script>
+            function loadModules() {
+                for (let i = 0; i < 5; i++) {
+                    let container = document.createElement('div');
+                    container.className = 'module-container';
+                    let label = document.createElement('label');
+                    label.className = 'module-label';
+                    label.textContent = moduleLabels[i];
+                    container.appendChild(label);
+                    container.innerHTML += `
+                        <select id="select-${i}"></select>
+                        <button onclick="submitOption(${i})">Submit</button>
+                        <div id="tags-${i}"></div>
+                    `;
+                    document.getElementById('moduleContainer').appendChild(container);
+                    loadOptions(i);
+                    loadTags(i);
+                }
+            }
 
-    window.onload = function() {
-        loadModules();
-    };
+            function loadOptions(index) {
+                fetch('/list', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({index: index})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    let select = document.getElementById(`select-${index}`);
+                    select.innerHTML = data.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                });
+            }
 
-    function loadModules() {
-        for (let i = 0; i < 5; i++) {
-            let container = document.createElement('div');
-            container.className = 'module-container';
-            container.innerHTML = `
-                <select id="select-${i}"></select>
-                <button onclick="submitOption(${i})">Submit</button>
-                <div id="tags-${i}"></div>
-            `;
-            document.getElementById('modules').appendChild(container);
-            loadOptions(i);
-            loadTags(i);
-        }
-    }
+            function loadTags(index) {
+                fetch('/get', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({index: index})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    let tagsContainer = document.getElementById(`tags-${index}`);
+                    tagsContainer.innerHTML = data.map(tag => `
+                        <span>${tag} <button class="close-btn" onclick="deleteTag('${tag}', ${index})">X</button></span>
+                    `).join('');
+                });
+            }
 
-    function loadOptions(index) {
-        fetch('/list', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({index: index})
-        })
-        .then(response => response.json())
-        .then(data => {
-            let select = document.getElementById(`select-${index}`);
-            select.innerHTML = data.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-        });
-    }
-
-    function loadTags(index) {
-        fetch('/get',{
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({index: index})
-        })
-        .then(response => response.json())
-        .then(data => {
-            let tagsContainer = document.getElementById(`tags-${index}`);
-            tagsContainer.innerHTML = data.map(tag => `
-                <span>${tag} <button onclick="deleteTag('${tag}', ${index})">X</button></span>
-            `).join('');
-        });
-    }
-
-    function submitOption(index) {
-        let select = document.getElementById(`select-${index}`);
-        let selectedValue = select.value;
-        // 这里可以添加将 selectedValue 发送到后端的逻辑
-        submit(selectedValue, index);
-        console.log('Submitted:', selectedValue);
-    }
-
-    function submit(selectedValue, index) {
-        console.log('Submitted:', selectedValue, 'from index:', index);
-        // 这里可以添加将 selectedValue 发送到后端的逻辑
-        // 例如，使用 fetch API 发送数据
-        fetch('/submit', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({selectedValue: selectedValue, index: index})
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Update response:', data);
-            // 这里可以添加一些对返回数据的处理逻辑
-            // 比如重新加载相关部分的 UI 来显示更新
-        })
-        .then(data => {
-            loadTags(index); // 重新加载标签以显示更新后的列表
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    function deleteTag(tag, index) {
-        fetch('/delete', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({index:index, delete_tag: tag})
-        })
-        .then(response => response.json())
-        .then(data => {
-            loadTags(index); // 重新加载标签以显示更新后的列表
-        });
-    }
-
-
-    var socket = io.connect('http://' + document.domain + ':' + location.port);
-
-    socket.on('output', function(data) {
-        var outputElement = document.getElementById('output');
-        var formattedData = data.data.replace(/  +/g, '<br>');
-        outputElement.innerHTML += formattedData;
-    });
-
-    function sendData() {
-        const inputText = document.getElementById('inputText').value;
-        fetch('/api/data', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({text: inputText})
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log(data.message);  // Process the final result if needed
-        })
-        .catch(error => console.error('Error:', error));
-    }
-    </script>
+            function submitOption(index) {
+                let select = document.getElementById(`select-${index}`);
+                let selectedValue = select.value;
+                // 这里可以添加将 selectedValue 发送到后端的逻辑
+                submit(selectedValue, index);
+                console.log('Submitted:', selectedValue);
+            }
+        
+            function submit(selectedValue, index) {
+                console.log('Submitted:', selectedValue, 'from index:', index);
+                // 这里可以添加将 selectedValue 发送到后端的逻辑
+                // 例如，使用 fetch API 发送数据
+                fetch('/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({selectedValue: selectedValue, index: index})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Update response:', data);
+                    // 这里可以添加一些对返回数据的处理逻辑
+                    // 比如重新加载相关部分的 UI 来显示更新
+                })
+                .then(data => {
+                    loadTags(index); // 重新加载标签以显示更新后的列表
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        
+            function deleteTag(tag, index) {
+                fetch('/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({index:index, delete_tag: tag})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loadTags(index); // 重新加载标签以显示更新后的列表
+                });
+            }
+        
+        
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+        
+            socket.on('output', function(data) {
+                var outputElement = document.getElementById('output');
+                var formattedData = data.data.replace(/  +/g, '<br>');
+                outputElement.innerHTML += formattedData;
+            });
+        
+            function sendData() {
+                const inputText = document.getElementById('inputText').value;
+                fetch('/api/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({text: inputText})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.message);  // Process the final result if needed
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        </script>
+    </div>
 </body>
 </html>
