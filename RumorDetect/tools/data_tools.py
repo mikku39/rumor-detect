@@ -4,9 +4,8 @@ import numpy as np
 from paddle.fluid.dygraph.base import to_variable
 import requests
 from bs4 import BeautifulSoup
-import os
 import url2io_client
-from RumorDetect.component import get_default_path, get_env
+from RumorDetect.component import get_default_path, get_env, logger
 
 # 获取数据
 
@@ -28,9 +27,9 @@ def load_data(sentence):
 
 
 def tx_search(keyword_list):
-    '''
-        使用天行数据接口根据关键词搜索新闻，需要配置环境变量 TJSX_API_KEY
-    '''
+    """
+    使用天行数据接口根据关键词搜索新闻，需要配置环境变量 TJSX_API_KEY
+    """
     conn = http.client.HTTPSConnection("apis.tianapi.com")  # 接口域名
     params = urllib.parse.urlencode(
         {"key": get_env("TJSX_API_KEY"), "word": keyword_list[0]}
@@ -45,14 +44,14 @@ def tx_search(keyword_list):
 
 
 # 返回google搜索结果
-def google_search(search_term, banned_url,**kwargs):
-    '''
-        使用谷歌搜索接口根据关键词搜索新闻，需要配置环境变量 CSE_API_KEY 和 CSE_ID
-    '''
+def google_search(search_term, banned_url, **kwargs):
+    """
+    使用谷歌搜索接口根据关键词搜索新闻，需要配置环境变量 CSE_API_KEY 和 CSE_ID
+    """
     api_key = get_env("CSE_API_KEY")
     cse_id = get_env("CSE_ID")
-    exclude_query = ' '.join(f'-site:{site}' for site in banned_url)
-    full_query = f'{search_term} {exclude_query}'
+    exclude_query = " ".join(f"-site:{site}" for site in banned_url)
+    full_query = f"{search_term} {exclude_query}"
     query_params = {"q": full_query, "key": api_key, "cx": cse_id}
     query_params.update(kwargs)
     response = requests.get(
@@ -69,9 +68,9 @@ def google_search(search_term, banned_url,**kwargs):
 
 # 返回bing搜索结果
 def bing_search(search_term, **kwargs):
-    '''
-        使用bing搜索接口根据关键词搜索新闻，需要配置环境变量 BING_SEARCH_KEY
-    '''
+    """
+    使用bing搜索接口根据关键词搜索新闻，需要配置环境变量 BING_SEARCH_KEY
+    """
     api_key = get_env("BING_SEARCH_KEY")
     headers = {"Ocp-Apim-Subscription-Key": api_key}
     headers.update(kwargs)
@@ -91,9 +90,9 @@ def bing_search(search_term, **kwargs):
 
 
 def bing_spider_search(search_term, **kwargs):
-    '''
-        使用bing爬虫搜索相关新闻
-    '''
+    """
+    使用bing爬虫搜索相关新闻
+    """
     url = "https://www.bing.com/search"
     params = {"q": search_term}
     response = requests.get(url, params=params)
@@ -119,7 +118,7 @@ def bing_spider_search(search_term, **kwargs):
 
 
 def get_url_ctx(url: str) -> Dict:
-    '''
+    """
     使用url2io接口获取网页正文内容
 
     Args:
@@ -127,10 +126,10 @@ def get_url_ctx(url: str) -> Dict:
 
     Returns:
         爬取的网页正文内容
-    '''
+    """
     configuration = url2io_client.Configuration()
     configuration.host = "http://url2api.applinzi.com"
-    configuration.api_key["token"] = get_env("URL2IO_KEY","")
+    configuration.api_key["token"] = get_env("URL2IO_KEY", "")
     api_instance = url2io_client.URL2ArticleApi(url2io_client.ApiClient(configuration))
     fields = ["text"]
     try:
@@ -138,35 +137,36 @@ def get_url_ctx(url: str) -> Dict:
         api_response = api_instance.get_article(url, fields=fields)
         return {"code": 200, "result": api_response.text}
     except Exception as e:
-        print(f"查找网页{url},出错：{e}")
+        logger.warn(f"查找网页{url},出错：{e}")
+        # print(f"查找网页{url},出错：{e}")
         return {"code": 403, "err_msg": e}
 
 
-def beauty_ctx(ctx)->str:
-    '''
-        使用 BeautifulSoup 库去除网页标签，美化网页内容
+def beauty_ctx(ctx) -> str:
+    """
+    使用 BeautifulSoup 库去除网页标签，美化网页内容
 
-        Args:
-            ctx: 爬取网页正文内容
+    Args:
+        ctx: 爬取网页正文内容
 
-        Returns:
-            优化后的正文内容
-    '''
+    Returns:
+        优化后的正文内容
+    """
     soup = BeautifulSoup(ctx, "lxml")
     return soup.get_text()
 
 
 # 返回网页内容
 def get_news_list(data_list: List[Dict]) -> List[Tuple]:
-    '''
-        根据每条新闻的url爬取新闻内容，并以此做下一步计算。如果爬不到就直接返回标题
+    """
+    根据每条新闻的url爬取新闻内容，并以此做下一步计算。如果爬不到就直接返回标题
 
-        Args:
-            data_list: 通过新闻搜索模块获取的原始新闻列表
+    Args:
+        data_list: 通过新闻搜索模块获取的原始新闻列表
 
-        Returns:
-            尝试爬取正文信息后的新闻列表
-    '''
+    Returns:
+        尝试爬取正文信息后的新闻列表
+    """
     news_list = []
     for data in data_list:
         news_data = get_url_ctx(data["url"])

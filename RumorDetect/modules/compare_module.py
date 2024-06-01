@@ -1,6 +1,7 @@
 from functools import partial
 import json
 import os
+from paddlehub.dataset.base_nlp_dataset import BaseNLPDataset
 from typing import Dict, List, Tuple
 
 import numpy as np

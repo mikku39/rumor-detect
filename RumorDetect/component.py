@@ -1,10 +1,26 @@
 import os
-from typing import List
 import requests
 import shutil
 from tqdm import tqdm
 from pathlib import Path
 
+import logging
+import sys
+
+# 创建 logger
+logger = logging.getLogger('my_logger')
+logger.setLevel(logging.DEBUG)  # 设置日志级别
+
+# 创建 stream handler，用于输出到stderr
+stream_handler = logging.StreamHandler(sys.stderr)
+stream_handler.setLevel(logging.WARNING)  # 设置此handler的日志级别为WARNING
+
+# 创建 formatter，并设置日志格式
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+stream_handler.setFormatter(formatter)
+
+# 将 handler 添加到 logger
+logger.addHandler(stream_handler)
 
 # 根据操作系统确定默认的下载路径
 def get_default_path():

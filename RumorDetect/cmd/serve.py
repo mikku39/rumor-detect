@@ -9,9 +9,10 @@ import numpy as np
 
 from RumorDetect.RumorDetect import rumor_detect
 import re
+import os
 
 app = Flask(
-    __name__, template_folder="/home/mikku/rumor-detect/RumorDetect/cmd/templates"
+    __name__, template_folder=f"{os.path.dirname(__file__)}/templates"
 )
 socketio = SocketIO(app)
 
@@ -152,7 +153,7 @@ def get_data():
             result = instance.run(input_text)
         finally:
             sys.stdout = original_stdout  # Restore the original stdout
-        return jsonify({"message": "Done!"})
+        return jsonify(result)
     else:
         if debug_instance is None:
             debug_instance = instance.debug_run(input_text)
@@ -166,7 +167,8 @@ def get_data():
         finally:
             print("单模块运行结束")
             sys.stdout = original_stdout  # Restore the original stdout
-        return jsonify({"message": "Done!"})
+        print(f"aaaa:{result}")
+        return jsonify(result)
 
 
 @app.route("/intermediate")
@@ -194,7 +196,6 @@ def debug_update():
     )
     return jsonify({"message": "Done!"})
 
-
 @click.group()
 def cli():
     """Group for the command line tool."""
@@ -204,6 +205,8 @@ def cli():
 @cli.command()
 def serve():
     """Command to start the Flask server."""
+    print(os.path.dirname(__file__))
+    print(f"{os.path.dirname(__file__)}/templates")
     socketio.run(app, debug=False, port=5000)
 
 
@@ -215,4 +218,6 @@ def debug():
 
 
 if __name__ == "__main__":
+    print(os.path.dirname(__file__))
+    print(f"{os.path.dirname(__file__)}/templates")
     cli()

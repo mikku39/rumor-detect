@@ -7,8 +7,9 @@ setup(
     author="mikku",
     author_email="mikku39chr@gmail.com",
     packages=find_packages(),
-    # package_data=package_data,
-    # package_dir=package_dir,
+    package_data={
+        'RumorDetect': ['cmd/templates/*.html'],  # Include all HTML files in cmd/templates
+    },
     install_requires=[
         # "paddlepaddle==2.3.2",
         "paddlepaddle-gpu==2.3.2",

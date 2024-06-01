@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict
 from dotenv import load_dotenv
 from RumorDetect.model import (
@@ -71,7 +72,7 @@ class rumor_detect:
         keyword_limit_num: int = 8,
         news_limit_num: int = 5,
     ):
-        load_dotenv()
+        load_dotenv(os.path.join(os.getcwd(), '.env'))
         self.update_params(locals())
         self.initialized = False
         self.judge_initialized = False
@@ -155,7 +156,8 @@ class rumor_detect:
             print("未初始化,正在按各模块的 mode 配置初始化")
             self.init()
         self.sent = sent
-
+        self.final_score = []
+        self.keywords = []
         if self.enable_search_compare:
             if self.enable_keyword:
                 for keywords_model in self.keywords_models:
@@ -195,6 +197,7 @@ class rumor_detect:
                         self.compare_result, headers="keys", tablefmt="grid"
                     )
                 )
+                self.final_score.extend([compare_result["final_score"] for compare_result in self.compare_result])
         if self.enable_judge:
             self.judge_result = []
             for judge_model in self.judge_models:
@@ -202,12 +205,18 @@ class rumor_detect:
             self.judge_result = self.aggregate_judge_result()  # 将所有模型的结果聚合
             print("judge结果如下：")
             print(tabulate.tabulate(self.judge_result, headers="keys", tablefmt="grid"))
+            self.final_score.extend([judge_result["finalscore"] for judge_result in self.judge_result])
+        final_score = power_mean(self.final_score)
+        print(f"最终置信度为{final_score},结果为{self.lab[final_score > 0.6]}")
+        return {"score":final_score, "result":self.lab[final_score > 0.6]}
 
     def debug_run(self, sent):
         '''
             Debug模式运行 Search_compare功能，以迭代器的方式执行每一步可以查看和修改中间变量
         '''
         self.sent = sent
+        self.final_score = []
+        self.keywords = []
         if not self.enable_search_compare:
             print("Debug模式只支持新闻比较功能，当前该功能未开启")
             return
@@ -223,7 +232,7 @@ class rumor_detect:
         print(
             "关键词搜索完毕。查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
-        yield
+        yield {"result":"功能未结束"}
         self.news_list = []
         for news_model in self.news_models:
             self.news_list.extend(
@@ -237,7 +246,7 @@ class rumor_detect:
         print(
             "新闻搜索完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
-        yield
+        yield {"result":"功能未结束"}
         if self.enable_summary:
             self.sent, self.news_list = self.summary_models[0].get_summary(
                 self.sent, self.news_list
@@ -246,7 +255,7 @@ class rumor_detect:
             "概要完毕.查看或修改中间变量请使用函数 self.get_intermediate() 和 self.update_params(key, value)"
         )
         print("再次运行即为最终结果")
-        yield
+        yield {"result":"功能未结束"}
         self.compare_result = []
         for compare_model in self.compare_models:
             self.compare_result.append(
@@ -256,7 +265,11 @@ class rumor_detect:
         print("search_compare结果如下：")
         print(tabulate.tabulate(self.compare_result, headers="keys", tablefmt="grid"))
         print("比较完毕.")
-        yield
+        self.final_score = [compare_result["final_score"] for compare_result in self.compare_result]
+        final_score = power_mean(self.final_score)
+        print(f"最终置信度为{final_score},结果为{self.lab[final_score > 0.6]}")
+        
+        yield {"score":final_score, "result":self.lab[final_score > 0.6]}
 
     # 聚合 search_compare 功能中多个 compare 函数的结果
     def aggregate_compare_result(self):
@@ -270,7 +283,7 @@ class rumor_detect:
                 ),
                 "final_score": power_mean([value["score"] for value in values]),
                 "predict": self.lab[
-                    power_mean([value["score"] for value in values]) > 0.5
+                    power_mean([value["score"] for value in values]) > 0.6
                 ],
             }
             for values in zip(*self.compare_result)
