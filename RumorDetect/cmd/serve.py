@@ -11,9 +11,7 @@ from RumorDetect.RumorDetect import rumor_detect
 import re
 import os
 
-app = Flask(
-    __name__, template_folder=f"{os.path.dirname(__file__)}/templates"
-)
+app = Flask(__name__, template_folder=f"{os.path.dirname(__file__)}/templates")
 socketio = SocketIO(app)
 
 clients = {}
@@ -196,21 +194,25 @@ def debug_update():
     )
     return jsonify({"message": "Done!"})
 
-@click.group()
+
+@click.group(
+    help="""
+    RumorDetect 是一个用于检测谣言的工具，提供了多种命令来管理和调试服务。
+    具体使用可看文档：https://mikku39.github.io/rumor-detect/
+    """
+)
 def cli():
     """Group for the command line tool."""
     pass
 
 
-@cli.command()
-def serve():
-    """Command to start the Flask server."""
-    print(os.path.dirname(__file__))
-    print(f"{os.path.dirname(__file__)}/templates")
-    socketio.run(app, debug=False, port=5000)
+@cli.command(help="以正常设置启动服务器。")
+@click.option("--port", default=5000, help="设置 Flask 服务器运行的端口。")
+def serve(port):
+    socketio.run(app, debug=False, port=port)
 
 
-@cli.command()
+@cli.command(help="以调试模式启动服务器。")
 def debug():
     global enable_debug
     enable_debug = True

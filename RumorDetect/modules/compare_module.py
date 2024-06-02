@@ -205,7 +205,6 @@ class EntailmentCompareModel(BaseCompareModel):
         index = 0
         result_list = []
         for batch_result in results[0][0]:
-            print(batch_result)
             score = batch_result[1]
             batch_result = np.argmax(batch_result)
             result_list.append(

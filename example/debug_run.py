@@ -8,4 +8,13 @@ instance = rumor_detect(
 )
 # sent = "朝鲜使用气球向韩国投放垃圾"
 sent = "隔夜西瓜不能吃，会中毒"
-instance.run(sent)
+tmp = instance.debug_run(sent)
+next(tmp)
+print(instance.get_intermediate())
+instance.update_params({"sent": "这是谣言吗", "keywords": ["这是谣言吗"]})
+print(instance.get_intermediate())
+next(tmp)
+print(instance.get_intermediate())
+next(tmp)
+print(instance.get_intermediate())
+next(tmp)
