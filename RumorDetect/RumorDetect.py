@@ -47,11 +47,11 @@ class rumor_detect:
         enable_summary : bool 是否开启概要生成
         enable_search_compare : bool 是否开启新闻搜索比较功能
         enable_judge : bool 是否开启模型谣言判断功能
-        news_mode : List[str] 新闻搜索模式
-        summary_mode : List[str] 摘要生成模式
-        compare_mode : List[str] 新闻比较模式
-        judge_mode : List[str] 谣言判断模式
-        banned_url : List[str] 在新闻搜索中禁止的网站
+        news_mode : List[str] 新闻搜索模式 - google / bing / bing_spider / tjsx
+        summary_mode : List[str] 摘要生成模式 - pegasus / baidu / ernie_bot
+        compare_mode : List[str] 新闻比较模式 - entailment / match / baidu / ernie_bot
+        judge_mode : List[str] 谣言判断模式 - cnn / ernie_bot
+        banned_url : List[str] 在新闻搜索中禁止的网站 
         keyword_limit_num : int 关键词提取的最大数量
         news_limit_num : int 新闻搜索的最大数量
     """
@@ -98,10 +98,10 @@ class rumor_detect:
         }
 
         self.news_dict = {  # 多种新闻搜索方式
-            "tjsx": TJSXNewsModel,  # 天聚数行API
             "google": GoogleNewsModel,  # google api搜索
             "bing": BingNewsModel,  # bing api搜索
             "bing_spider": BingSpiderNewsModel,  # bing爬虫搜索
+            "tjsx": TJSXNewsModel,  # 天聚数行API
         }
 
         self.summary_dict = {  # 多种摘要方式

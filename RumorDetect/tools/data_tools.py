@@ -129,6 +129,7 @@ def get_url_ctx(url: str) -> Dict:
     """
     configuration = url2io_client.Configuration()
     configuration.host = "http://url2api.applinzi.com"
+    # configuration.host = "220.181.136.116"
     configuration.api_key["token"] = get_env("URL2IO_KEY", "")
     api_instance = url2io_client.URL2ArticleApi(url2io_client.ApiClient(configuration))
     fields = ["text"]

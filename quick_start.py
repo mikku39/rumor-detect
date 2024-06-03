@@ -6,6 +6,6 @@ instance = rumor_detect(
     compare_mode=["entailment", "ernie_bot"],
     judge_mode=["cnn", "ernie_bot"],
 )
-# sent = "朝鲜使用气球向韩国投放垃圾"
-sent = "隔夜西瓜不能吃，会中毒"
+sent = "朝鲜使用气球向韩国投放垃圾"
+# sent = "隔夜西瓜不能吃，会中毒"
 instance.run(sent)

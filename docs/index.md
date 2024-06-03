@@ -1,6 +1,6 @@
 # Welcome to Rumor Detect Docs
 
-这里是ykk的ysu毕业设计项目——微博谣言检测的文档。
+这里是杨开开的ysu毕业设计项目——微博谣言检测的文档。
 将会包含教程和API文档
 
 ## 安装教程
